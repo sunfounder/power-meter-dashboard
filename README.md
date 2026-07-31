@@ -1,26 +1,27 @@
-# Power Meter Dashboard
+# Power Meter Dashboard v1.1
 
-Single-page dashboard for the 4-Channel Power Meter device.
+SunFounder 4-Channel Power Meter 仪表板。
 
-## Files
+## 使用
 
-| File | Purpose |
-|------|---------|
-| `index.html` | Main dashboard — connect, monitor, record, download |
-| `docs.html` | REST API reference — send to AI for context |
+用浏览器打开：`https://sunfounder.github.io/power-meter-dashboard/`
 
-## Usage
+输入设备 IP 地址连接。
 
-1. Open `index.html` in a browser
-2. Enter the device IP (AP: `192.168.4.1` or STA IP)
-3. Click Connect
+## 功能
 
-## API Docs
+- 4 通道实时数据（V/A/W/°C）+ ECharts 图表
+- 独立通道录制（REC/STOP/Reset），二进制 .dat 存储
+- Flash 存储管理（文件列表/下载/删除/空间进度条）
+- 自动停止条件（电压/电流/时长/下降沿）
+- 温度单位切换、时区设置、密码显示切换
+- 全量历史数据加载（刷新后图表恢复）
+- 纯 HTTP 轮询，无需 WebSocket
 
-Click the &#9432; button (top-right) or open `docs.html` directly.
-Share `docs.html` with AI assistants for API-aware help.
+## API 文档
 
-## Device Dependencies
+点击右上角 ⓘ 按钮，或直接打开 `docs.html`。
 
-- [power-meter-firmware](../power-meter-firmware/) (ESP32-S3)
-- No build step required — pure static HTML
+## 设备依赖
+
+- [power-meter-firmware](https://github.com/sunfounder/power-meter-firmware) v0.3.0+

@@ -127,7 +127,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button></div>
     <div style="text-align:center;font-size:10px;color:var(--dim);margin-top:8px" id="fwVer">固件版本: --</div>
-    <div style="text-align:center;font-size:10px;color:#444">Dashboard v1.0</div>
+    <div style="text-align:center;font-size:10px;color:#444">Dashboard v1.1</div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
