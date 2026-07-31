@@ -393,8 +393,8 @@ static void handleSettings(AsyncWebServerRequest *request) {
       MeasurementEngine::getInstance().setSampleInterval(cfg.sampleIntervalMs());
       updated = true;
     }
-    if (request->hasParam("temp_unit")) {
-      String unit = request->getParam("temp_unit")->value();
+    if (request->hasParam("temp_unit", true)) {
+      String unit = request->getParam("temp_unit", true)->value();
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
