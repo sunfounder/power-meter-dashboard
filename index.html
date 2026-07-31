@@ -127,7 +127,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div>
-    <div id="fileList" style="max-height:300px;overflow-y:auto">Loading...</div>
+    <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
+    <div id="storageBar" style="font-size:10px;color:var(--dim);margin-top:6px"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -441,9 +442,13 @@ function openFiles(){document.getElementById('filesOverlay').classList.add('show
 function loadFiles(){
   api('/api/files').then(d=>{
     const el=document.getElementById('fileList');
-    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';return;}
-    el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>'+
-      d.map(f=>'<div class="file-row"><span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span><a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'">DL</a><button class="btn-del" onclick="if(confirm(\'Delete?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();else toast(\'Del fail\')})}">X</button></div>').join('');
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
+    else{el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>'+
+      d.map(f=>'<div class="file-row"><span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span><a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'">DL</a><button class="btn-del" onclick="if(confirm(\'确认删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();else toast(\'删除失败\')})}">X</button></div>').join('');}
+  });
+  api('/api/storage').then(s=>{
+    if(!s)return;
+    document.getElementById('storageBar').innerHTML='存储: '+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 可用)';
   });
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
