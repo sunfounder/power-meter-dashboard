@@ -126,6 +126,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <!-- rotation hidden until LVGL driver supports it -->
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
+    <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button></div>
     <div style="text-align:center;font-size:10px;color:var(--dim);margin-top:8px" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:10px;color:#444">Dashboard v1.1</div>
@@ -569,6 +570,7 @@ function openSettings(){
     document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
     document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
     document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
+    document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
   });
 }
 function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
