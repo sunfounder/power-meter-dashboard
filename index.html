@@ -119,8 +119,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>AP Password</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">Save</button></div></div>
     <div class="section"><label>Timezone</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <div class="section"><label>Chart X min (min)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
-    <div class="section"><label>Display Rotation</label><div class="toggle-group"><button class="toggle-btn" onclick="saveSet('rotation','0')" id="rot0">0°</button><button class="toggle-btn" onclick="saveSet('rotation','180')" id="rot180">180°</button></div></div>
-    <div class="section"><label>Temperature Unit</label><div class="toggle-group"><button class="toggle-btn" onclick="saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>Display Rotation</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'rot0','rot180');saveSet('rotation','0')" id="rot0">0°</button><button class="toggle-btn" onclick="toggle2(this,'rot180','rot0');saveSet('rotation','180')" id="rot180">180°</button></div></div>
+    <div class="section"><label>Temperature Unit</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><label>WiFi STA</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">Connect</button></div></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('Restart?'))api('/api/restart',{method:'POST'})">Restart</button></div>
   </div>
@@ -446,16 +446,17 @@ function openSettings(){
     document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
     document.getElementById('setTz').value=d.tz_offset||8;
     // Highlight active toggle buttons
-    const r=d.rotation||0;
+    const r=parseInt(d.rotation)||0;
     document.getElementById('rot0').className='toggle-btn'+(r==0?' active':'');
     document.getElementById('rot180').className='toggle-btn'+(r==180?' active':'');
-    document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!=='F'?' active':'');
-    document.getElementById('tuF').className='toggle-btn'+(d.temp_unit==='F'?' active':'');
+    document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
+    document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
   });
 }
 function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
 function saveXMin(v){localStorage.setItem('pm_xmin',v);}
 function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
+function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
 function saveWiFi(){
   const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
   api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
