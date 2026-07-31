@@ -331,11 +331,11 @@ static void scope_timer_cb(lv_timer_t *) {
   if(++sc%20==0) Serial.printf("[SCOPE] CH%d V=%.2f A=%.3f\n", _scope_ch+1, s.bus_voltage_V, s.current_mA/1000.0f);
   if (_scope_lbl_v) {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%.2f", s.bus_voltage_V);
+    snprintf(buf, sizeof(buf), "%5.2f V", s.bus_voltage_V);
     lv_label_set_text(_scope_lbl_v, buf);
-    snprintf(buf, sizeof(buf), "%.3f", s.current_mA/1000.0f);
+    snprintf(buf, sizeof(buf), "%5.3f A", s.current_mA/1000.0f);
     lv_label_set_text(_scope_lbl_a, buf);
-    snprintf(buf, sizeof(buf), "%.2f", s.power_mW/1000.0f);
+    snprintf(buf, sizeof(buf), "%5.2f W", s.power_mW/1000.0f);
     lv_label_set_text(_scope_lbl_w, buf);
   }
 }
@@ -384,7 +384,7 @@ void power_meter_scope_show() {
   lv_obj_set_style_radius(t, 3, 0);
   lv_obj_set_width(t, 52);
 
-  // V badge: value + unit separate
+  // V badge
   _scope_lbl_v = lv_label_create(bar);
   lv_obj_set_style_text_color(_scope_lbl_v, lv_color_white(), 0);
   lv_obj_set_style_bg_color(_scope_lbl_v, lv_color_hex(0xE27005), 0);
@@ -392,9 +392,9 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_v, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_v, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_v, 3, 0);
-  lv_obj_set_width(_scope_lbl_v, 60);
+  lv_obj_set_width(_scope_lbl_v, 78);
   lv_obj_set_style_text_align(_scope_lbl_v, LV_TEXT_ALIGN_RIGHT, 0);
-  lv_label_set_text(_scope_lbl_v, "0.00");
+  lv_label_set_text(_scope_lbl_v, " 0.00 V");
 
   // A badge
   _scope_lbl_a = lv_label_create(bar);
@@ -404,9 +404,9 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_a, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_a, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_a, 3, 0);
-  lv_obj_set_width(_scope_lbl_a, 60);
+  lv_obj_set_width(_scope_lbl_a, 78);
   lv_obj_set_style_text_align(_scope_lbl_a, LV_TEXT_ALIGN_RIGHT, 0);
-  lv_label_set_text(_scope_lbl_a, "0.000");
+  lv_label_set_text(_scope_lbl_a, "0.000 A");
 
   // W badge
   _scope_lbl_w = lv_label_create(bar);
@@ -416,20 +416,9 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_w, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_w, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_w, 3, 0);
-  lv_obj_set_width(_scope_lbl_w, 60);
+  lv_obj_set_width(_scope_lbl_w, 78);
   lv_obj_set_style_text_align(_scope_lbl_w, LV_TEXT_ALIGN_RIGHT, 0);
-  lv_label_set_text(_scope_lbl_w, "0.00");
-
-  // Unit labels (no bg, just text)
-  lv_obj_t *uv = lv_label_create(bar);
-  lv_label_set_text(uv, "V");
-  lv_obj_set_style_text_color(uv, lv_color_hex(0xE27005), 0);
-  lv_obj_t *ua = lv_label_create(bar);
-  lv_label_set_text(ua, "A");
-  lv_obj_set_style_text_color(ua, lv_color_hex(0x3CB84C), 0);
-  lv_obj_t *uw = lv_label_create(bar);
-  lv_label_set_text(uw, "W");
-  lv_obj_set_style_text_color(uw, lv_color_hex(0x4895EF), 0);
+  lv_label_set_text(_scope_lbl_w, " 0.00 W");
 
   _scope_timer = lv_timer_create(scope_timer_cb, 10, nullptr);
 }
