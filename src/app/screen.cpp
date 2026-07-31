@@ -331,11 +331,11 @@ static void scope_timer_cb(lv_timer_t *) {
   if(++sc%20==0) Serial.printf("[SCOPE] CH%d V=%.2f A=%.3f\n", _scope_ch+1, s.bus_voltage_V, s.current_mA/1000.0f);
   if (_scope_lbl_v) {
     char buf[20];
-    snprintf(buf, sizeof(buf), "%.2f V", s.bus_voltage_V);
+    snprintf(buf, sizeof(buf), "%.2fV", s.bus_voltage_V);
     lv_label_set_text(_scope_lbl_v, buf);
-    snprintf(buf, sizeof(buf), "%.3f A", s.current_mA/1000.0f);
+    snprintf(buf, sizeof(buf), "%.3fA", s.current_mA/1000.0f);
     lv_label_set_text(_scope_lbl_a, buf);
-    snprintf(buf, sizeof(buf), "%.2f W", s.power_mW/1000.0f);
+    snprintf(buf, sizeof(buf), "%.2fW", s.power_mW/1000.0f);
     lv_label_set_text(_scope_lbl_w, buf);
   }
 }
@@ -349,17 +349,11 @@ void power_meter_scope_show() {
   lv_obj_set_style_border_width(_scope_page, 0, 0);
   lv_obj_set_style_pad_all(_scope_page, 0, 0);
 
-  // Channel label
-  char lbl[8]; snprintf(lbl, 8, "CH%d", _scope_ch+1);
-  lv_obj_t *ch_label = lv_label_create(_scope_page);
-  lv_label_set_text(ch_label, lbl);
-  lv_obj_set_style_text_color(ch_label, lv_color_hex(0xE27005), 0);
-  lv_obj_set_style_text_font(ch_label, &lv_font_montserrat_14, 0);
-  lv_obj_align(ch_label, LV_ALIGN_TOP_LEFT, 4, 2);
-
+  // Top bar: CH label + V/A/W in one row
   _scope_chart = lv_chart_create(_scope_page);
-  lv_obj_set_size(_scope_chart, 310, 140);
-  lv_obj_align(_scope_chart, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_set_size(_scope_chart, 320, 146);
+  lv_obj_set_pos(_scope_chart, 0, 24);
+  lv_obj_set_style_border_width(_scope_chart, 0, 0);
   lv_chart_set_type(_scope_chart, LV_CHART_TYPE_LINE);
   lv_chart_set_point_count(_scope_chart, 500);
   lv_chart_set_range(_scope_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 10);
@@ -369,22 +363,62 @@ void power_meter_scope_show() {
   _scope_ser_v = lv_chart_add_series(_scope_chart, lv_color_hex(0xE27005), LV_CHART_AXIS_PRIMARY_Y);
   _scope_ser_a = lv_chart_add_series(_scope_chart, lv_color_hex(0x3CB84C), LV_CHART_AXIS_SECONDARY_Y);
 
-  // Real-time values (fixed positions)
-  _scope_lbl_v = lv_label_create(_scope_page);
-  lv_obj_set_style_text_color(_scope_lbl_v, lv_color_hex(0xE27005), 0);
-  lv_obj_set_style_text_font(_scope_lbl_v, &lv_font_montserrat_14, 0);
-  lv_obj_align(_scope_lbl_v, LV_ALIGN_TOP_RIGHT, -4, 2);
-  lv_label_set_text(_scope_lbl_v, "0.00 V");
+  // Top row: CH label + V/A/W compact
+  lv_obj_t *bar = lv_obj_create(_scope_page);
+  lv_obj_set_size(bar, 320, 22);
+  lv_obj_set_style_bg_color(bar, lv_color_hex(0x0a0a0a), 0);
+  lv_obj_set_style_border_width(bar, 0, 0);
+  lv_obj_set_style_pad_all(bar, 0, 0);
+  lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  _scope_lbl_a = lv_label_create(_scope_page);
-  lv_obj_set_style_text_color(_scope_lbl_a, lv_color_hex(0x3CB84C), 0);
-  lv_obj_align_to(_scope_lbl_a, _scope_lbl_v, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
-  lv_label_set_text(_scope_lbl_a, "0.000 A");
+  // CH badge (dark gray, distinct from V)
+  char lbl[8]; snprintf(lbl, 8, "CH%d", _scope_ch+1);
+  lv_obj_t *t = lv_label_create(bar);
+  lv_label_set_text(t, lbl);
+  lv_obj_set_style_text_color(t, lv_color_white(), 0);
+  lv_obj_set_style_bg_color(t, lv_color_hex(0x333333), 0);
+  lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_hor(t, 8, 0);
+  lv_obj_set_style_pad_ver(t, 2, 0);
+  lv_obj_set_style_radius(t, 3, 0);
+  lv_obj_set_width(t, 45);
 
-  _scope_lbl_w = lv_label_create(_scope_page);
-  lv_obj_set_style_text_color(_scope_lbl_w, lv_color_hex(0x4895EF), 0);
-  lv_obj_align_to(_scope_lbl_w, _scope_lbl_a, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
-  lv_label_set_text(_scope_lbl_w, "0.00 W");
+  // V badge
+  _scope_lbl_v = lv_label_create(bar);
+  lv_obj_set_style_text_color(_scope_lbl_v, lv_color_white(), 0);
+  lv_obj_set_style_bg_color(_scope_lbl_v, lv_color_hex(0xE27005), 0);
+  lv_obj_set_style_bg_opa(_scope_lbl_v, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_hor(_scope_lbl_v, 6, 0);
+  lv_obj_set_style_pad_ver(_scope_lbl_v, 2, 0);
+  lv_obj_set_style_radius(_scope_lbl_v, 3, 0);
+  lv_obj_set_width(_scope_lbl_v, 66);
+  lv_obj_set_style_text_align(_scope_lbl_v, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(_scope_lbl_v, "0.00V");
+
+  // A badge
+  _scope_lbl_a = lv_label_create(bar);
+  lv_obj_set_style_text_color(_scope_lbl_a, lv_color_white(), 0);
+  lv_obj_set_style_bg_color(_scope_lbl_a, lv_color_hex(0x3CB84C), 0);
+  lv_obj_set_style_bg_opa(_scope_lbl_a, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_hor(_scope_lbl_a, 6, 0);
+  lv_obj_set_style_pad_ver(_scope_lbl_a, 2, 0);
+  lv_obj_set_style_radius(_scope_lbl_a, 3, 0);
+  lv_obj_set_width(_scope_lbl_a, 69);
+  lv_obj_set_style_text_align(_scope_lbl_a, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(_scope_lbl_a, "0.000A");
+
+  // W badge
+  _scope_lbl_w = lv_label_create(bar);
+  lv_obj_set_style_text_color(_scope_lbl_w, lv_color_white(), 0);
+  lv_obj_set_style_bg_color(_scope_lbl_w, lv_color_hex(0x4895EF), 0);
+  lv_obj_set_style_bg_opa(_scope_lbl_w, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_hor(_scope_lbl_w, 6, 0);
+  lv_obj_set_style_pad_ver(_scope_lbl_w, 2, 0);
+  lv_obj_set_style_radius(_scope_lbl_w, 3, 0);
+  lv_obj_set_width(_scope_lbl_w, 66);
+  lv_obj_set_style_text_align(_scope_lbl_w, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(_scope_lbl_w, "0.00W");
 
   _scope_timer = lv_timer_create(scope_timer_cb, 10, nullptr);
 }
