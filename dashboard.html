@@ -110,6 +110,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>Device Name</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
     <div class="section"><label>AP Password</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">Save</button></div></div>
     <div class="section"><label>Timezone</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
+    <div class="section"><label>Chart X min (min)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
     <div class="section"><label>WiFi STA</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">Connect</button></div></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('Restart?'))api('/api/restart',{method:'POST'})">Restart</button></div>
   </div>
@@ -149,6 +150,7 @@ const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
 let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],pfx=['test','test','test','test'];
 let recState=[0,0,0,0]; // 0=idle, 1=recording, 2=stopped
 let recFiles=['','','',''];
+let recStart=[0,0,0,0];
 const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
 const MAX_FILES=10;
 
@@ -230,15 +232,14 @@ function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
   c.setOption({
-    grid:{left:55,right:50,top:8,bottom:20},
+    grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true},
-    xAxis:{type:'time',min:Date.now()-600000,max:Date.now(),axisLabel:{color:'#555',fontSize:8,formatter:v=>{
-      const d=new Date(v);return ('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);
-    }}},
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:14,bottom:2,borderColor:'#333',backgroundColor:'#111',fillerColor:'rgba(226,112,5,0.2)'}],
+    xAxis:{type:'value',min:0,max:getXMin()*60,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
-      {type:'value',name:'V',position:'left',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{color:C[0],fontSize:9},min:0},
-      {type:'value',name:'A/W',position:'right',offset:0,splitLine:{show:false},axisLabel:{color:C[1],fontSize:9},min:0},
-      {type:'value',name:'C',position:'right',offset:40,splitLine:{show:false},axisLabel:{color:C[3],fontSize:9},min:0}
+      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0}
     ],
     series:[
       {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none'},
@@ -257,7 +258,7 @@ function poll(){
     if(d.recording)for(let i=0;i<4;i++){
       const r=d.recording[i];if(!r)continue;
       if(r.active && recState[i]===0){
-        recState[i]=1;
+        recState[i]=1;recStart[i]=Date.now();
         document.getElementById('cr'+i).classList.add('recording');
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
@@ -315,7 +316,6 @@ function up(){
 
 function uc(){
   if(!lastData)return;
-  const ts=(lastData.timestamp||Date.now()/1000)*1000; // ms
   for(let i=0;i<4;i++){
     const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
     const c=charts[i];if(!c)continue;
@@ -327,15 +327,11 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
-    // Auto-scroll X axis: keep last 10 min visible
-    const now=Date.now();
-    const xMin=now-600000;
-    const opts={xAxis:{min:xMin,max:now},series:[]};
+    const elapsed=(Date.now()-recStart[i])/1000; // seconds since start
+    const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([ts,pts[m]]);
-      // trim data older than 30 min
-      while(data.length>1&&data[0][0]<now-1800000)data.shift();
+      data.push([elapsed,pts[m]]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
@@ -347,7 +343,7 @@ function tr(i){
   const btn=document.getElementById('cb'+i);
 
   if(recState[i]===0){ // IDLE → START RECORDING
-    recState[i]=1;
+    recState[i]=1;recStart[i]=Date.now();
     document.getElementById('cr'+i).classList.add('recording');
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='STOP';btn.className='btn-rec stop';
@@ -435,6 +431,8 @@ function openSettings(){
   });
 }
 function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
+function saveXMin(v){localStorage.setItem('pm_xmin',v);}
+function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
 function saveWiFi(){
   const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
   api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
@@ -479,7 +477,7 @@ async function loadBufferData(i){
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map(p=>[p.t*1000,parseFloat(p[key])||0]);
+    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});

@@ -107,7 +107,7 @@ static void add_metric(lv_obj_t *card, int ch, int idx, int w, int y) {
   lv_obj_set_style_bg_opa(unit, LV_OPA_COVER, 0);
   lv_obj_set_style_pad_hor(unit, 4, 0);
   lv_obj_set_style_pad_ver(unit, 1, 0);
-  lv_obj_set_style_radius(unit, 2, 0);
+  lv_obj_set_style_radius(unit, 4, 0);
   lv_obj_set_width(unit, 26);  // fixed width for alignment
   _unit_labels[ch][idx] = unit;
 }
