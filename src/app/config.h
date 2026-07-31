@@ -12,6 +12,19 @@
 
 class DeviceSettings {
 public:
+  // Per-channel auto-stop conditions
+  struct StopCond {
+    bool  enabled = false;
+    float voltage_threshold_V  = 0;
+    float current_threshold_mA = 0;
+    uint16_t max_duration_min  = 0;
+    bool  falling_edge = true;
+    bool  armed_V  = false;
+    bool  armed_mA = false;
+    float peak_V  = 0;
+    float peak_mA = 0;
+  };
+
   static DeviceSettings &getInstance();
 
   void begin();
@@ -53,6 +66,11 @@ public:
   uint16_t rotation() const { return _rotation; }
   void setRotation(uint16_t r);
 
+  // Auto-stop conditions (per channel)
+  const StopCond &stopCond(int ch) const { return _stop[ch]; }
+  void setStopCond(int ch, bool enabled, float v_thresh, float mA_thresh, uint16_t max_min, bool falling);
+  void setStopArmed(int ch, bool armed_V, bool armed_mA);
+
 private:
   DeviceSettings();
 
@@ -67,5 +85,7 @@ private:
   uint32_t _sample_interval_ms;
   char _temp_unit;  // 'C' or 'F'
   int8_t _tz_offset;
-  uint16_t _rotation;  // 0, 90, 180, 270 // hours from UTC, default 8 (China)
+  uint16_t _rotation;  // 0, 90, 180, 270
+
+  StopCond _stop[4];
 };

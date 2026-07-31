@@ -409,6 +409,17 @@ static void handleSettings(AsyncWebServerRequest *request) {
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
+    if (request->hasParam("stop_ch", true)) {
+      int ch = request->getParam("stop_ch", true)->value().toInt();
+      cfg.setStopCond(ch,
+        request->hasParam("stop_en", true)  && request->getParam("stop_en", true)->value() == "1",
+        request->hasParam("stop_v", true)   ? request->getParam("stop_v", true)->value().toFloat() : 0,
+        request->hasParam("stop_mA", true)  ? request->getParam("stop_mA", true)->value().toFloat() : 0,
+        request->hasParam("stop_min", true) ? request->getParam("stop_min", true)->value().toInt() : 0,
+        request->hasParam("stop_fall", true)? request->getParam("stop_fall", true)->value() == "1" : true
+      );
+      updated = true;
+    }
     if (request->hasParam("rotation", true)) {
       uint16_t r = request->getParam("rotation", true)->value().toInt();
       Serial.printf("[SET] rotation=%d\n", r);
@@ -453,6 +464,18 @@ static void handleSettings(AsyncWebServerRequest *request) {
   doc["temp_unit"] = String(cfg.tempUnit());
   doc["tz_offset"] = cfg.tzOffset();
   doc["rotation"] = cfg.rotation();
+
+  // Stop conditions per channel
+  JsonArray sc_arr = doc["stop_cond"].to<JsonArray>();
+  for (int i = 0; i < 4; i++) {
+    auto &sc = cfg.stopCond(i);
+    JsonObject o = sc_arr.add<JsonObject>();
+    o["en"] = sc.enabled;
+    o["v"]  = sc.voltage_threshold_V;
+    o["mA"] = sc.current_threshold_mA;
+    o["min"]= sc.max_duration_min;
+    o["fall"]= sc.falling_edge;
+  }
 
   // Computed AP SSID: device_name + "-" + last 3 bytes of MAC
   uint8_t mac[6];

@@ -75,6 +75,21 @@ void DeviceSettings::load() {
   _tz_offset = prefs.getChar("tz_offset", 8);
   _rotation  = prefs.getUShort("rotation", 0);
 
+  // Load stop conditions per channel
+  for (int i = 0; i < 4; i++) {
+    char key[16];
+    snprintf(key, sizeof(key), "stop_en%d", i);
+    _stop[i].enabled = prefs.getBool(key, false);
+    snprintf(key, sizeof(key), "stop_v%d", i);
+    _stop[i].voltage_threshold_V = prefs.getFloat(key, 0);
+    snprintf(key, sizeof(key), "stop_mA%d", i);
+    _stop[i].current_threshold_mA = prefs.getFloat(key, 0);
+    snprintf(key, sizeof(key), "stop_min%d", i);
+    _stop[i].max_duration_min = prefs.getUShort(key, 0);
+    snprintf(key, sizeof(key), "stop_fall%d", i);
+    _stop[i].falling_edge = prefs.getBool(key, true);
+  }
+
   prefs.end();
 
   Serial.println("[SET] Settings loaded from NVS");
@@ -110,6 +125,21 @@ void DeviceSettings::save() {
   prefs.putChar("temp_unit", _temp_unit);
   prefs.putChar("tz_offset", _tz_offset);
   prefs.putUShort("rotation", _rotation);
+
+  // Save stop conditions per channel
+  for (int i = 0; i < 4; i++) {
+    char key[16];
+    snprintf(key, sizeof(key), "stop_en%d", i);
+    prefs.putBool(key, _stop[i].enabled);
+    snprintf(key, sizeof(key), "stop_v%d", i);
+    prefs.putFloat(key, _stop[i].voltage_threshold_V);
+    snprintf(key, sizeof(key), "stop_mA%d", i);
+    prefs.putFloat(key, _stop[i].current_threshold_mA);
+    snprintf(key, sizeof(key), "stop_min%d", i);
+    prefs.putUShort(key, _stop[i].max_duration_min);
+    snprintf(key, sizeof(key), "stop_fall%d", i);
+    prefs.putBool(key, _stop[i].falling_edge);
+  }
 
   prefs.end();
   Serial.println("[SET] Settings saved to NVS");
@@ -170,4 +200,19 @@ void DeviceSettings::setTzOffset(int8_t off) {
 void DeviceSettings::setRotation(uint16_t r) {
   if (r != 180) r = 0;
   _rotation = r;
+}
+
+void DeviceSettings::setStopCond(int ch, bool en, float v_thresh, float mA_thresh, uint16_t max_min, bool falling) {
+  if (ch < 0 || ch > 3) return;
+  _stop[ch].enabled = en;
+  _stop[ch].voltage_threshold_V = v_thresh;
+  _stop[ch].current_threshold_mA = mA_thresh;
+  _stop[ch].max_duration_min = max_min;
+  _stop[ch].falling_edge = falling;
+}
+
+void DeviceSettings::setStopArmed(int ch, bool armed_V, bool armed_mA) {
+  if (ch < 0 || ch > 3) return;
+  _stop[ch].armed_V = armed_V;
+  _stop[ch].armed_mA = armed_mA;
 }

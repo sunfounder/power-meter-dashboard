@@ -37,6 +37,7 @@ public:
   // Channel alarm configs
   ChannelAlarmConfig &alarmConfig(int ch) { return _alarm_configs[ch]; }
   void checkAlarms();
+  void checkAutoStop();
 
   // Get channel manager
   ChannelManager &channels() { return _ch_mgr; }
