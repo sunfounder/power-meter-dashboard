@@ -75,9 +75,9 @@ void MeasurementEngine::update() {
   uint32_t now = millis();
   auto &recorder = DataRecorder::getInstance();
 
-  // Fast scope mode: single channel, 100ms, no temp, no record
+  // Fast scope mode: single channel, 10ms, no temp, no record
   if (_fast_ch >= 0) {
-    if (now - _last_sample_ms >= 100) {
+    if (now - _last_sample_ms >= 10) {
       _last_sample_ms = now;
       auto m = _ina226[_fast_ch].readAll();
       _snapshot.timestamp_ms = time(nullptr);

@@ -323,6 +323,8 @@ static void scope_timer_cb(lv_timer_t *) {
   auto &s = MeasurementEngine::getInstance().getLatest().channels[_scope_ch];
   lv_chart_set_next_value(_scope_chart, _scope_ser_v, s.bus_voltage_V);
   lv_chart_set_next_value(_scope_chart, _scope_ser_a, s.current_mA / 1000.0f);
+  static int sc=0;
+  if(++sc%20==0) Serial.printf("[SCOPE] CH%d V=%.2f A=%.3f\n", _scope_ch+1, s.bus_voltage_V, s.current_mA/1000.0f);
 }
 
 void power_meter_scope_show() {
@@ -334,19 +336,27 @@ void power_meter_scope_show() {
   lv_obj_set_style_border_width(_scope_page, 0, 0);
   lv_obj_set_style_pad_all(_scope_page, 0, 0);
 
+  // Channel label
+  char lbl[8]; snprintf(lbl, 8, "CH%d", _scope_ch+1);
+  lv_obj_t *ch_label = lv_label_create(_scope_page);
+  lv_label_set_text(ch_label, lbl);
+  lv_obj_set_style_text_color(ch_label, lv_color_hex(0xE27005), 0);
+  lv_obj_set_style_text_font(ch_label, &lv_font_montserrat_14, 0);
+  lv_obj_align(ch_label, LV_ALIGN_TOP_LEFT, 4, 2);
+
   _scope_chart = lv_chart_create(_scope_page);
-  lv_obj_set_size(_scope_chart, 310, 150);
-  lv_obj_align(_scope_chart, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_size(_scope_chart, 310, 140);
+  lv_obj_align(_scope_chart, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_chart_set_type(_scope_chart, LV_CHART_TYPE_LINE);
-  lv_chart_set_point_count(_scope_chart, 200);
-  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
-  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_SECONDARY_Y, 0, 20);
-  lv_chart_set_div_line_count(_scope_chart, 5, 5);
+  lv_chart_set_point_count(_scope_chart, 500);
+  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 10);
+  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_SECONDARY_Y, 0, 5);
+  lv_chart_set_div_line_count(_scope_chart, 5, 4);
 
   _scope_ser_v = lv_chart_add_series(_scope_chart, lv_color_hex(0xE27005), LV_CHART_AXIS_PRIMARY_Y);
   _scope_ser_a = lv_chart_add_series(_scope_chart, lv_color_hex(0x3CB84C), LV_CHART_AXIS_SECONDARY_Y);
 
-  _scope_timer = lv_timer_create(scope_timer_cb, 100, nullptr);
+  _scope_timer = lv_timer_create(scope_timer_cb, 10, nullptr);
 }
 
 void power_meter_scope_hide() {

@@ -99,6 +99,7 @@ void setup() {
   Serial.println("========================================");
 
   buzzer.begin();
+  button_init();
   WebLog::getInstance().begin();
   DeviceSettings::getInstance().begin();
 
