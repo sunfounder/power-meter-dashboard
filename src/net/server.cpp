@@ -319,6 +319,7 @@ static void handleStatus(AsyncWebServerRequest *request) {
   doc["any_recording"] = recorder.isAnyRecording();
   doc["ambient_temp_C"] = snap.env.ambient_temp_C;
   doc["temp_unit"] = String(cfg.tempUnit());
+  doc["scope_ch"] = me.fastChannel();
 
   JsonArray ch_arr = doc["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {

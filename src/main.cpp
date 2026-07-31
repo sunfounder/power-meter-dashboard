@@ -11,6 +11,7 @@
 #include "net/log.h"
 #include "hal/buzzer.h"
 #include "hal/pin_config.h"
+#include "hal/button.h"
 #include "hal/display.h"
 
 static Buzzer buzzer(PIN_BUZZER);
@@ -154,6 +155,13 @@ void loop() {
   lv_tick_inc(now - last_lvgl_tick);
   last_lvgl_tick = now;
   lv_timer_handler();
+
+  // ── Button input ──
+  button_loop();
+  VirtualKey key = button_get_virtual_key();
+  if (key == VKEY_UP)    power_meter_key_up();
+  if (key == VKEY_ENTER) power_meter_key_enter();
+  if (key == VKEY_BACK)  power_meter_key_back();
 
   MeasurementEngine::getInstance().update();
   buzzer.update();
