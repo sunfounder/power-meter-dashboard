@@ -268,7 +268,8 @@ function poll(){
     if(d.recording)for(let i=0;i<4;i++){
       const r=d.recording[i];if(!r)continue;
       if(r.active && recState[i]===0){
-        recState[i]=1;recStart[i]=Date.now();
+        recState[i]=1;
+        // recStart set by loadBufferData from real timestamps
         document.getElementById('cr'+i).classList.add('recording');
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
@@ -498,10 +499,13 @@ async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
+  // Use real timestamps from buffer to align X axis
+  const firstT=d[0].t; // UNIX seconds of first sample
+  recStart[i]=Date.now()-(d[d.length-1].t-firstT)*1000; // back-calculate start time
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
+    const data=d.map(p=>[p.t-firstT,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
