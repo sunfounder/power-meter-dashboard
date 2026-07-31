@@ -204,6 +204,30 @@ function togglePw(id,btn){
   el.type=el.type==='password'?'text':'password';
   btn.innerHTML=el.type==='password'?'<i class="fa fa-eye"></i>':'<i class="fa fa-eye-slash"></i>';
 }
+function toggleStopPanel(i){
+  const p=document.getElementById('sp'+i);
+  p.style.display=p.style.display==='none'?'block':'none';
+  if(p.style.display==='block')loadStopCond(i);
+}
+function loadStopCond(i){
+  api('/api/settings').then(d=>{
+    if(!d||!d.stop_cond)return;
+    const sc=d.stop_cond[i];
+    document.getElementById('se'+i).checked=sc.en;
+    document.getElementById('sv'+i).value=sc.v;
+    document.getElementById('sm'+i).value=sc.mA;
+    document.getElementById('sd'+i).value=sc.min;
+    document.getElementById('sf'+i).checked=sc.fall;
+  });
+}
+function saveStop(i){
+  const en=document.getElementById('se'+i).checked?'1':'0';
+  const v=document.getElementById('sv'+i).value;
+  const mA=document.getElementById('sm'+i).value;
+  const min=document.getElementById('sd'+i).value;
+  const fall=document.getElementById('sf'+i).checked?'1':'0';
+  api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:i,stop_en:en,stop_v:v,stop_mA:mA,stop_min:min,stop_fall:fall})});
+}
 (function init(){
   const ip=(new URLSearchParams(location.search)).get('ip')||getSavedIP();
   if(ip){document.getElementById('connIP').value=ip;doConnect();}
@@ -225,9 +249,17 @@ function build(){
       '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')"><i class="fa fa-pen"></i></button></div>'+
       '<span class="timer" id="ct'+i+'">00:00</span>'+
       '<button class="btn-rec go" id="cb'+i+'" onclick="tr('+i+')">REC</button>'+
+      '<button class="btn-icon" onclick="toggleStopPanel('+i+')" title="停止条件" style="font-size:10px;padding:2px 5px;margin-left:2px"><i class="fa fa-cog"></i></button>'+
       '<span class="file-info" id="fi'+i+'"></span>'+
       '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'"><i class="fa fa-caret-down"></i> Log</button></div>'+
-      '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>';
+      '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>'+
+      '<div class="stop-panel" id="sp'+i+'" style="display:none;margin-top:4px;padding:6px 8px;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:6px;font-size:11px">'+
+      '<label style="color:var(--dim);margin-right:8px"><input type="checkbox" id="se'+i+'" onchange="saveStop('+i+')"> 启用</label>'+
+      '电压 &lt; <input type="number" id="sv'+i+'" value="0" step="0.1" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')"> V'+
+      ' 电流 &lt; <input type="number" id="sm'+i+'" value="0" step="1" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')"> mA'+
+      ' 最大 <input type="number" id="sd'+i+'" value="0" step="1" min="0" style="width:40px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')"> min'+
+      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 下降沿</label>'+
+      '</div>';
     l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
   }
 }
@@ -276,7 +308,7 @@ function poll(){
   api('/api/status').then(d=>{
     if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
     lastData=d;document.getElementById('connDot').className='conn-dot';
-    if(d.temp_unit){tempUnit=d.temp_unit;console.log('tempUnit:',tempUnit);}
+    if(d.temp_unit){tempUnit=d.temp_unit;}
 
     // Recover recording state after page refresh
     if(d.recording)for(let i=0;i<4;i++){
