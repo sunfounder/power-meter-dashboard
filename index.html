@@ -140,10 +140,10 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">自动停止条件</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
     <style>.stop-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}.stop-row input[type=number]{width:80px;padding:6px 8px;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;text-align:right;-moz-appearance:textfield}.stop-row input[type=number]::-webkit-inner-spin-button,.stop-row input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.stop-row input[type=checkbox]{width:16px;height:16px;margin:0;flex-shrink:0}.stop-row .stop-label{}</style>
-    <div class="stop-row"><input type="checkbox" id="stopEn"><span class="stop-label">启用自动停止</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_mA"><span class="stop-label">电流低于</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_V"><span class="stop-label">电压低于</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_min"><span class="stop-label">最长录制</span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopEn" checked><span class="stop-label">启用自动停止</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_V" checked><span class="stop-label">电压低于</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_mA" checked><span class="stop-label">电流低于</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">最长录制</span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
     <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">下降沿模式（需先高于阈值×1.2再降下来才触发）</span></div>
     <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">保存</button>
   </div>
