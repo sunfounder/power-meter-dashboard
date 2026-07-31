@@ -398,8 +398,8 @@ static void handleSettings(AsyncWebServerRequest *request) {
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
-    if (request->hasParam("rotation")) {
-      uint16_t r = request->getParam("rotation")->value().toInt();
+    if (request->hasParam("rotation", true)) {
+      uint16_t r = request->getParam("rotation", true)->value().toInt();
       Serial.printf("[SET] rotation=%d\n", r);
       cfg.setRotation(r);
       if (g_lv_disp) {
