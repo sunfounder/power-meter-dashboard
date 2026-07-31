@@ -241,11 +241,14 @@ function saveRecName(i){
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
+  const now=Math.floor(Date.now()/1000);
   c.setOption({
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',min:0,max:600,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
+    xAxis:{type:'value',min:now-600,max:now,axisLabel:{color:'#555',fontSize:8,formatter:v=>{
+      const dt=new Date(v*1000);return ('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)+':'+('0'+dt.getSeconds()).slice(-2);
+    }}},
     yAxis:[
       {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
@@ -352,11 +355,10 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
-    const elapsedSec=ts-recStart[i]/1000;
     const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([elapsedSec,pts[m]]);
+      data.push([ts,pts[m]]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
