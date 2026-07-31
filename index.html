@@ -83,6 +83,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 .file-row .fname{flex:1;color:var(--text)}.file-row .fsize{color:#555;font-size:10px}
 .btn-dl{background:var(--accent);color:#fff;padding:3px 9px;border:none;border-radius:3px;cursor:pointer;font-size:10px;text-decoration:none}
 .btn-del{background:#2a2a2a;color:var(--red);padding:3px 7px;border:none;border-radius:3px;cursor:pointer;font-size:10px}
+.pw-group{position:relative;display:flex;flex:1}
+.pw-group input{flex:1;padding-right:30px}
+.pw-group .pw-eye{position:absolute;right:0;top:0;bottom:0;width:28px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px}
 .data-scroll{max-height:200px;overflow-y:auto;display:none;margin-top:4px;background:#0a0a0a;border-radius:4px;padding:4px}
 .data-table{width:100%;font-size:9px;border-collapse:collapse}
 .data-table th{color:var(--dim);padding:2px 4px;text-align:center}
@@ -116,8 +119,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">设置</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
     <div class="section"><label>设备 IP</label><div class="row"><input type="text" id="setIP" readonly style="background:#0a0a0a;color:var(--dim)"><button class="btn-buzz" onclick="disconnect()" style="background:#3a1010;color:var(--red);border-color:var(--red)">断开</button></div></div>
     <div class="section"><label>设备名称</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
-    <div class="section"><label>AP 密码</label><div class="row"><input type="password" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="togglePw('setApPass',this)" style="margin-left:auto"><i class="fa fa-eye"></i></button><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)">保存</button></div></div>
-    <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="togglePw('setWifiPass',this)"><i class="fa fa-eye"></i></button><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
+    <div class="section"><label>AP 密码</label><div class="row"><div class="pw-group"><input type="password" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="pw-eye" onclick="togglePw('setApPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)">保存</button></div></div>
+    <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><div class="pw-group"><input type="password" id="setWifiPass" placeholder="Password"><button class="pw-eye" onclick="togglePw('setWifiPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
     <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <!-- rotation hidden until LVGL driver supports it -->
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
