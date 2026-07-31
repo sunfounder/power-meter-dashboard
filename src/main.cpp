@@ -22,7 +22,8 @@ Buzzer &g_buzzer = buzzer;
 static uint32_t last_web_broadcast = 0;
 static uint32_t last_lvgl_tick = 0;
 static uint32_t last_ntp_check = 0;
-static lv_display_t *_lv_disp = nullptr; // for flush-ready callback
+static lv_display_t *_lv_disp = nullptr;
+lv_display_t *g_lv_disp = nullptr; // exported for server.cpp live rotation // for flush-ready callback
 
 // LVGL flush callback — defer lv_display_flush_ready to I80 completion
 static void lvgl_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map) {
@@ -146,6 +147,7 @@ void setup() {
   lv_display_set_rotation(d, (lv_display_rotation_t)(DeviceSettings::getInstance().rotation() / 90));
   _lv_disp = d;
   display_set_on_flush_ready(on_i80_flush_ready);
+  g_lv_disp = d;
   lv_group_create();
   DIAG();
 

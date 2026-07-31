@@ -168,6 +168,6 @@ void DeviceSettings::setTzOffset(int8_t off) {
 }
 
 void DeviceSettings::setRotation(uint16_t r) {
-  if (r != 90 && r != 180 && r != 270) r = 0;
+  if (r != 180) r = 0;
   _rotation = r;
 }

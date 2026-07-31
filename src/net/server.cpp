@@ -13,6 +13,9 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <lvgl.h>
+
+extern lv_display_t *g_lv_disp; // from main.cpp, for live rotation
 
 static AsyncWebServer _server(80);
 static AsyncWebSocket _ws("/ws");
@@ -394,7 +397,10 @@ static void handleSettings(AsyncWebServerRequest *request) {
       updated = true;
     }
     if (request->hasParam("rotation", true)) {
-      cfg.setRotation(request->getParam("rotation", true)->value().toInt());
+      uint16_t r = request->getParam("rotation", true)->value().toInt();
+      cfg.setRotation(r);
+      // Apply rotation live
+      if (g_lv_disp) lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
       updated = true;
     }
     if (request->hasParam("tz_offset", true)) {      cfg.setTzOffset(
