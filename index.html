@@ -249,7 +249,7 @@ function loadStopCond(i){
 function saveStop(i){
   const v=document.getElementById('sv'+i).value;
   const a=parseFloat(document.getElementById('sm'+i).value);
-  const h=parseFloat(document.getElementById('sd'+i').value);
+  const h=parseFloat(document.getElementById('sd'+i).value);
   const fall=document.getElementById('sf'+i).checked?'1':'0';
   const en=(parseFloat(v)>0||a>0||h>0)?'1':'0';
   api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall})});
