@@ -13,9 +13,6 @@
 #include "hal/pin_config.h"
 #include "hal/display.h"
 
-#define DIAG() Serial.printf("[DIAG] %s: DMA free=%u total=%u\n", __FUNCTION__, \
-  heap_caps_get_free_size(MALLOC_CAP_DMA), heap_caps_get_total_size(MALLOC_CAP_DMA))
-
 static Buzzer buzzer(PIN_BUZZER);
 Buzzer &g_buzzer = buzzer;
 
@@ -23,7 +20,7 @@ static uint32_t last_web_broadcast = 0;
 static uint32_t last_lvgl_tick = 0;
 static uint32_t last_ntp_check = 0;
 static lv_display_t *_lv_disp = nullptr;
-lv_display_t *g_lv_disp = nullptr; // exported for server.cpp live rotation // for flush-ready callback
+lv_display_t *g_lv_disp = nullptr; // for flush-ready callback
 
 // LVGL flush callback — defer lv_display_flush_ready to I80 completion
 static void lvgl_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map) {
@@ -100,8 +97,6 @@ void setup() {
   Serial.println("  ESP32-S3 / T-Display-S3");
   Serial.println("========================================");
 
-  DIAG();  // baseline
-
   buzzer.begin();
   WebLog::getInstance().begin();
   DeviceSettings::getInstance().begin();
@@ -118,26 +113,19 @@ void setup() {
   else
     DataRecorder::getInstance().listFiles();
 
-  // ── Step 1: WiFi FIRST (claim DMA channels early) ──
-  DIAG();
+  // ── Step 1: WiFi FIRST ──
   PowerMeterWebServer::getInstance().startAP();
-  DIAG();
   printAPDiagnostics();
 
   // ── Step 2: I80 + LVGL + UI ──
   display_init();
-  DIAG();
   Serial.println("[INIT] I80 done");
   delay(2000);
 
   lv_init();
-  DIAG();
-  // Use a smaller draw buffer (1/10 screen) — full-screen buffer
-  // steals 106KB of DMA memory, leaving only 24KB for WiFi.
-  const size_t draw_buf_sz = LCD_H_RES * 60;  // 60 lines, ~38KB DMA
+  const size_t draw_buf_sz = LCD_H_RES * 60;
   lv_color_t *buf = (lv_color_t *)heap_caps_malloc(
       draw_buf_sz * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-  DIAG();
   lv_display_t *d = lv_display_create(LCD_H_RES, LCD_V_RES);
   lv_display_set_color_format(d, LV_COLOR_FORMAT_RGB565_SWAPPED);
   lv_display_set_buffers(d, buf, NULL, draw_buf_sz * sizeof(lv_color_t),
@@ -149,16 +137,12 @@ void setup() {
   display_set_on_flush_ready(on_i80_flush_ready);
   g_lv_disp = d;
   lv_group_create();
-  DIAG();
 
   show_splash_screen();
-  DIAG();
   power_meter_init();
-  DIAG();
 
   // ── Step 3: Restart WiFi ──
   PowerMeterWebServer::getInstance().startAP();
-  DIAG();
   PowerMeterWebServer::getInstance().begin();
   printAPDiagnostics();
 }

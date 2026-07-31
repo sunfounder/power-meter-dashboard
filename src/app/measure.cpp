@@ -97,6 +97,10 @@ void MeasurementEngine::_sampleAll() {
   _snapshot.timestamp_ms = time(nullptr);  // real UTC seconds
 
   for (int i = 0; i < 4; i++) {
+    // Always read NTC (even if INA226 not connected)
+    float ntc_v = _ads1115.readVoltage(i);
+    _snapshot.channels[i].channel_temp_C = _ntc.voltageToTemp(ntc_v);
+
     if (!_connected[i]) continue;
 
     auto m = _ina226[i].readAll();
@@ -107,8 +111,6 @@ void MeasurementEngine::_sampleAll() {
     _snapshot.channels[i].power_mW         = m.power_mW;
     _snapshot.channels[i].timestamp_ms     = _snapshot.timestamp_ms;
     _snapshot.channels[i].connected        = true;
-    // Read NTC in same loop to avoid I2C interleaving
-    _snapshot.channels[i].channel_temp_C = _ntc.voltageToTemp(_ads1115.readVoltage(i));
   }
 
   // Read ambient temperature

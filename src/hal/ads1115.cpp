@@ -1,7 +1,7 @@
 #include "ads1115.h"
 
 ADS1115::ADS1115(uint8_t addr)
-    : _addr(addr), _gain(GAIN_2_048V), _voltage_LSB(0.0000625f), _wire(nullptr) {}
+    : _addr(addr), _gain(GAIN_6_144V), _voltage_LSB(0.0001875f), _wire(nullptr) {}
 
 bool ADS1115::begin(TwoWire &wire) {
   _wire = &wire;
@@ -9,7 +9,7 @@ bool ADS1115::begin(TwoWire &wire) {
 
   // Set default config: gain ±2.048V, 128 SPS, continuous mode off initially
   // We'll use single-shot mode for each read
-  setGain(GAIN_2_048V);
+  setGain(GAIN_6_144V);
   setDataRate(RATE_128_SPS);
   return true;
 }
