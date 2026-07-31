@@ -392,17 +392,18 @@ static void handleSettings(AsyncWebServerRequest *request) {
       MeasurementEngine::getInstance().setSampleInterval(cfg.sampleIntervalMs());
       updated = true;
     }
-    if (request->hasParam("temp_unit", true)) {
-      String unit = request->getParam("temp_unit", true)->value();
+    if (request->hasParam("temp_unit")) {
+      String unit = request->getParam("temp_unit")->value();
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
-    if (request->hasParam("rotation", true)) {
-      uint16_t r = request->getParam("rotation", true)->value().toInt();
+    if (request->hasParam("rotation")) {
+      uint16_t r = request->getParam("rotation")->value().toInt();
       Serial.printf("[SET] rotation=%d\n", r);
       cfg.setRotation(r);
       if (g_lv_disp) {
         lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
+        lv_obj_invalidate(lv_screen_active());
         lv_refr_now(NULL);
         Serial.printf("[SET] rotation applied: %d\n", r);
       } else {
