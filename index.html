@@ -352,7 +352,6 @@ function poll(){
       if(r.active && recState[i]===0){
         recState[i]=1;
         sampleCount[i]=r.samples||0;
-        console.log('recover CH'+(i+1)+': samples='+r.samples+' sampleCount='+sampleCount[i]);
         document.getElementById('cr'+i).classList.add('recording');
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
@@ -615,7 +614,6 @@ async function downloadCSV(i){
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
-  console.log('loadBuffer CH'+(i+1)+': dataLen='+(d?d.length:0));
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
   // Total samples from status; buffer has only last N
@@ -629,6 +627,10 @@ async function loadBufferData(i){
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
+  // Focus viewport on recent data (last ~10 min)
+  const total=sampleCount[i];
+  const winSize=Math.min(600,total); // 600 samples = 10 min
+  c.dispatchAction({type:'dataZoom',start:(total-winSize)/total*100,end:100});
 }
 </script>
 </body>
