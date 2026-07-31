@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>4CH Power Meter</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+:root{--bg:#080808;--card-bg:#141414;--border:#2a2a2a;--accent:#e27005;--text:#e0e0e0;--dim:#777;--red:#e04040;--green:#3cb84c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body.locked .main-area{opacity:0.3;pointer-events:none}
+.header{background:#0c0c0c;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.header .title{font-size:16px;color:var(--accent);font-weight:700}
+.header .right{display:flex;align-items:center;gap:10px}
+.ambient{font-size:12px;color:var(--dim)}
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.conn-dot.lost{background:var(--red)}
+.btn-icon{background:none;border:1px solid var(--border);color:var(--text);font-size:14px;padding:3px 8px;border-radius:4px;cursor:pointer}
+.btn-icon:hover{background:#222}
+.main-area{max-width:1100px;margin:0 auto;padding:8px 12px}
+.ch-row{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;padding:8px}
+.ch-row.recording{border-color:var(--red)}
+.ch-row.stopped{border-color:var(--accent)}
+.ch-main{display:flex;gap:8px;align-items:stretch}
+.ch-metrics-box{display:flex;flex-direction:column;gap:4px;background:#111;border:1px solid #222;border-radius:8px;padding:6px 8px;min-width:100px;flex:0 0 110px}
+.ch-top{display:flex;align-items:center;gap:6px}
+.ch-name{font-size:14px;font-weight:700;color:var(--accent)}
+.ch-conn-bar{display:block;height:3px;background:#333;border-radius:2px}
+.ch-conn-bar.on{background:var(--accent)}
+.ch-cards{display:grid;grid-template-columns:1fr;gap:2px}
+.m-card{background:#0a0a0a;border:1px solid #222;border-radius:4px;display:flex;align-items:stretch;overflow:hidden}
+.m-value{flex:1;padding:3px 6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.m-unit{padding:3px 7px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;min-width:28px;justify-content:center}
+.ch-chart-box{background:#0a0a0a;border:1px solid #222;border-radius:8px;overflow:hidden;flex:1;min-width:0;height:130px}
+.data-bar{display:flex;align-items:center;gap:6px;margin-top:6px;padding:4px 8px;background:#0c0c0c;border-radius:6px;border:1px solid #1a1a1a;font-size:11px;flex-wrap:wrap}
+.rec-name-group{display:flex;align-items:center;gap:4px}
+.rec-name{color:var(--dim);font-size:10px}
+.rec-name-input{border:1px solid var(--accent);background:#0a0a0a;color:var(--text);font-size:10px;padding:1px 4px;border-radius:3px;width:100px;display:none}
+.rec-name-group.editing .rec-name{display:none}
+.rec-name-group.editing .rec-name-input{display:inline-block}
+.rec-name-group.editing .btn-edit-rec{display:none}
+.btn-edit-rec{background:none;border:none;color:var(--dim);cursor:pointer;font-size:10px;padding:1px 3px}
+.btn-edit-rec:hover{color:var(--accent)}
+.timer{font-weight:700;font-size:14px;min-width:50px}
+.samples{color:var(--dim);font-size:10px}
+.btn-rec{padding:3px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;min-width:60px}
+.btn-rec.go{background:var(--red);color:#fff}
+.btn-rec.stop{background:#444;color:#fff}
+.btn-rec.reset{background:var(--accent);color:#fff}
+.file-info{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--dim)}
+.file-info a{color:var(--accent);text-decoration:none}
+.file-info button{background:none;border:none;color:var(--red);cursor:pointer;font-size:10px}
+.btn-log{background:none;border:none;color:var(--dim);cursor:pointer;font-size:10px;padding:2px 8px;margin-left:auto}
+.btn-log:hover{color:var(--accent)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;z-index:200;opacity:0;transition:opacity 0.3s}
+.toast.show{opacity:1}
+.conn-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;justify-content:center;align-items:center}
+.conn-overlay.hide{display:none}
+.conn-box{background:#181818;border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center;width:360px}
+.conn-box h2{color:var(--accent);margin-bottom:8px}
+.conn-box input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:6px;background:#0a0a0a;color:var(--text);font-size:18px;text-align:center;font-family:monospace;margin-bottom:12px}
+.conn-box .conn-btn{background:var(--accent);color:#fff;border:none;padding:10px 40px;border-radius:6px;cursor:pointer;font-size:15px;font-weight:700;width:100%}
+.conn-box .conn-err{color:var(--red);font-size:11px}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:100;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:#181818;border:1px solid var(--border);border-radius:10px;padding:20px 24px;width:92%;max-width:480px;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:16px;color:var(--accent);margin-bottom:10px}
+.modal .section{margin-bottom:10px}
+.modal .section label{display:block;font-size:11px;color:var(--dim)}
+.modal .section input{padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%}
+.modal .section .row{display:flex;gap:8px}.modal .section .row input{flex:1}
+.btn-buzz{background:#2a2a2a;color:var(--accent);border:1px solid var(--accent);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px}
+.btn-restart{background:#3a1010;color:var(--red);border:1px solid var(--red);padding:7px 18px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;width:100%}
+.file-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+.file-row .fname{flex:1;color:var(--text)}.file-row .fsize{color:#555;font-size:10px}
+.btn-dl{background:var(--accent);color:#fff;padding:3px 9px;border:none;border-radius:3px;cursor:pointer;font-size:10px;text-decoration:none}
+.btn-del{background:#2a2a2a;color:var(--red);padding:3px 7px;border:none;border-radius:3px;cursor:pointer;font-size:10px}
+.data-scroll{max-height:200px;overflow-y:auto;display:none;margin-top:4px;background:#0a0a0a;border-radius:4px;padding:4px}
+.data-table{width:100%;font-size:9px;border-collapse:collapse}
+.data-table th{color:var(--dim);padding:2px 4px;text-align:center}
+.data-table td{padding:1px 4px;color:var(--text);text-align:center}
+</style>
+</head>
+<body>
+<div class="conn-overlay" id="connOverlay">
+  <div class="conn-box">
+    <h2>Connect to Device</h2>
+    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">Enter the IP address</p>
+    <input id="connIP" placeholder="192.168.4.1" onkeydown="if(event.key==='Enter')doConnect()" autofocus>
+    <div class="conn-err" id="connErr"></div>
+    <button class="conn-btn" onclick="doConnect()">Connect</button>
+  </div>
+</div>
+<div class="header">
+  <span class="title">4CH Power Meter</span>
+  <div class="right">
+    <span class="ambient" id="ambTemp">Amb: --.-</span>
+    <span class="conn-dot lost" id="connDot"></span>
+    <button class="btn-icon" onclick="openFiles()" title="Files">&#x1F4C1;</button>
+    <button class="btn-icon" onclick="openSettings()" title="Settings">&#x2699;</button>
+    <button class="btn-icon" onclick="openAPI()" title="API Docs" style="color:var(--accent)">&#x24D8;</button>
+  </div>
+</div>
+<div class="main-area" id="channelList"></div>
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">Settings</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
+    <div class="section"><label>Device IP</label><div class="row"><input type="text" id="setIP"><button class="btn-buzz" onclick="reconnect()">Reconnect</button></div></div>
+    <div class="section"><label>Device Name</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
+    <div class="section"><label>AP Password</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">Save</button></div></div>
+    <div class="section"><label>Timezone</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
+    <div class="section"><label>WiFi STA</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">Connect</button></div></div>
+    <div class="section"><button class="btn-restart" onclick="if(confirm('Restart?'))api('/api/restart',{method:'POST'})">Restart</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="filesOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">Files</h2><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div>
+    <div id="fileList" style="max-height:300px;overflow-y:auto">Loading...</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="apiOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">API Docs</h2><button class="btn-icon" onclick="closeModal('apiOverlay')">X</button></div>
+    <div style="font-size:12px;line-height:1.6">
+      <b>GET /ping</b> — health check → "pong"<br>
+      <b>GET /api/status</b> — all channels + recording states<br>
+      <b>GET /api/files</b> — list CSV files<br>
+      <b>POST /api/channel/{0-3}/record/start</b> body: name=test<br>
+      <b>POST /api/channel/{0-3}/record/stop</b><br>
+      <b>POST /api/channel/{0-3}/name</b> body: name=CH1<br>
+      <b>GET /api/download?file=xxx.csv</b><br>
+      <b>POST /api/delete?file=xxx.csv</b><br>
+      <b>GET/POST /api/settings</b><br>
+      <b>POST /api/wifi</b> body: ssid=X&password=Y<br>
+      <b>POST /api/restart</b><br>
+      <b>POST /api/buzzer/test</b><br>
+      <b>GET /api/logs</b>
+    </div>
+  </div>
+</div>
+
+<script>
+let DEVICE='',pollTimer=null;
+const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
+const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
+let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],pfx=['test','test','test','test'];
+let recState=[0,0,0,0]; // 0=idle, 1=recording, 2=stopped
+let recFiles=['','','',''];
+const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
+const MAX_FILES=10;
+
+function api(p,o){return fetch(DEVICE+p,o).then(r=>r.json()).catch(()=>null)}
+function getSavedIP(){return localStorage.getItem('pm_ip')||''}
+function saveIP(ip){localStorage.setItem('pm_ip',ip)}
+
+function setDevice(ip){
+  DEVICE='http://'+ip;document.getElementById('setIP').value=ip;
+  document.getElementById('connOverlay').classList.add('hide');
+  document.body.classList.remove('locked');saveIP(ip);
+  for(let i=0;i<4;i++){if(charts[i]){charts[i].dispose();charts[i]=null;}}
+  build();
+  if(pollTimer)clearInterval(pollTimer);
+  poll();pollTimer=setInterval(poll,1000);
+}
+function doConnect(){
+  const ip=document.getElementById('connIP').value.trim();
+  if(!ip){document.getElementById('connErr').textContent='Enter IP';return;}
+  document.getElementById('connErr').textContent='Connecting...';
+  fetch('http://'+ip+'/ping').then(r=>{
+    if(r.ok)setDevice(ip);
+    else document.getElementById('connErr').textContent='Not found';
+  }).catch(()=>{document.getElementById('connErr').textContent='Cannot reach '+ip;});
+}
+function reconnect(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  document.body.classList.add('locked');
+  document.getElementById('connDot').className='conn-dot lost';
+  document.getElementById('connOverlay').classList.remove('hide');
+  document.getElementById('connIP').value=getSavedIP();
+  document.getElementById('connIP').focus();
+  document.getElementById('channelList').innerHTML='';
+}
+(function init(){
+  const ip=(new URLSearchParams(location.search)).get('ip')||getSavedIP();
+  if(ip){document.getElementById('connIP').value=ip;doConnect();}
+  else{document.body.classList.add('locked');document.getElementById('connOverlay').classList.remove('hide');}
+})();
+
+function build(){
+  const l=document.getElementById('channelList');l.innerHTML='';
+  for(let i=0;i<4;i++){
+    const d=document.createElement('div');d.className='ch-row';d.id='cr'+i;
+    d.innerHTML=
+      '<div class="ch-main">'+
+      '<div class="ch-metrics-box"><div class="ch-top"><span class="ch-name" id="cn'+i+'">'+names[i]+'</span><span class="ch-conn-bar" id="cc'+i+'"></span></div>'+
+      '<div class="ch-cards">'+['V','A','W','C'].map((m,j)=>
+        '<div class="m-card"><span class="m-value dim" id="cv'+i+'_'+j+'">---</span><span class="m-unit" id="cu'+i+'_'+j+'" style="background:'+C[j]+'">'+m+'</span></div>'
+      ).join('')+'</div></div>'+
+      '<div class="ch-chart-box" id="cx'+i+'"></div></div>'+
+      '<div class="data-bar">'+
+      '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')">&#9998;</button></div>'+
+      '<span class="timer" id="ct'+i+'">00:00</span>'+
+      '<button class="btn-rec go" id="cb'+i+'" onclick="tr('+i+')">REC</button>'+
+      '<span class="file-info" id="fi'+i+'"></span>'+
+      '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'">&#9660; Log</button></div>'+
+      '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>';
+    l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
+  }
+}
+
+function editRecName(i){
+  const g=document.getElementById('rng'+i);
+  document.getElementById('rni'+i).value=pfx[i];g.classList.add('editing');
+  const inp=document.getElementById('rni'+i);inp.focus();
+  inp.onblur=()=>saveRecName(i);
+  inp.onkeydown=e=>{if(e.key==='Enter')saveRecName(i);};
+}
+function saveRecName(i){
+  const v=document.getElementById('rni'+i).value.trim();
+  if(!v)return;pfx[i]=v;
+  document.getElementById('rn'+i).textContent=v;
+  document.getElementById('rng'+i).classList.remove('editing');
+  // test name is local — does NOT change channel name on device
+}
+
+function ic(i){
+  const d=document.getElementById('cx'+i);if(!d||charts[i])return;
+  const X60=Array.from({length:61},(_,k)=>(k<10?'0':'')+k+':00'); // 0-60 min
+  const N=10; // initial visible minutes
+  const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
+  c.setOption({
+    grid:{left:45,right:50,top:8,bottom:20},
+    tooltip:{trigger:'axis',confine:true},
+    xAxis:{type:'category',show:true,data:X60.slice(0,N+1),axisLabel:{color:'#555',fontSize:8,interval:2},max:N},
+    yAxis:[
+      {type:'value',name:'V',position:'left',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{color:C[0],fontSize:9},min:0},
+      {type:'value',name:'A/W',position:'right',offset:0,splitLine:{show:false},axisLabel:{color:C[1],fontSize:9},min:0},
+      {type:'value',name:'C',position:'right',offset:40,splitLine:{show:false},axisLabel:{color:C[3],fontSize:9},min:0}
+    ],
+    series:[
+      {name:'V',type:'line',yAxisIndex:0,data:Array(61).fill(null),lineStyle:{color:C[0],width:1.5},symbol:'none'},
+      {name:'A',type:'line',yAxisIndex:1,data:Array(61).fill(null),lineStyle:{color:C[1],width:1.5},symbol:'none'},
+      {name:'W',type:'line',yAxisIndex:1,data:Array(61).fill(null),lineStyle:{color:C[2],width:1.5},symbol:'none'},
+      {name:'C',type:'line',yAxisIndex:2,data:Array(61).fill(null),lineStyle:{color:C[3],width:1.5},symbol:'none'}
+    ],animation:false});
+}
+
+function poll(){
+  api('/api/status').then(d=>{
+    if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
+    lastData=d;document.getElementById('connDot').className='conn-dot';
+
+    // Recover recording state after page refresh
+    if(d.recording)for(let i=0;i<4;i++){
+      const r=d.recording[i];if(!r)continue;
+      if(r.active && recState[i]===0){
+        recState[i]=1;
+        document.getElementById('cr'+i).classList.add('recording');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='STOP';btn.className='btn-rec stop';
+        document.getElementById('rn'+i).textContent=r.name||pfx[i];
+        loadBufferData(i);  // fill chart with buffered data
+      }
+    }
+    up();uc();updateTables();
+  });
+}
+
+function updateTables(){
+  for(let i=0;i<4;i++){
+    const tb=document.getElementById('dtb'+i);if(!tb)continue;
+    const d=dataStore[i];if(!d.length)continue;
+    tb.innerHTML=d.map((r,j)=>
+      '<tr><td>'+(j+1)+'</td><td>'+r.t+'</td><td>'+r.V.toFixed(3)+'</td><td>'+r.A.toFixed(3)+'</td><td>'+r.W.toFixed(3)+'</td><td>'+r.C.toFixed(1)+'</td></tr>'
+    ).join('');
+    const s=tb.closest('.data-scroll');if(!s)continue;
+    if(s.scrollHeight-s.scrollTop-s.clientHeight<20)s.scrollTop=s.scrollHeight;
+  }
+}
+
+function up(){
+  if(!lastData)return;
+  const d=lastData,chs=d.channels;
+  document.getElementById('ambTemp').textContent='Amb: '+(d.ambient_temp_C!=null?d.ambient_temp_C.toFixed(1)+' C':'--.-');
+
+  for(let i=0;i<4;i++){
+    const ch=chs[i];if(!ch)continue;const ok=ch.connected;
+    for(let j=0;j<4;j++){
+      const el=document.getElementById('cv'+i+'_'+j);if(!el)continue;
+      if(!ok){el.textContent='---';el.className='m-value dim';continue;}
+      let raw=ch[MKEYS[j]];if(raw==null||isNaN(raw))raw=0;
+      el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?(raw/1000).toFixed(3):raw.toFixed(1));
+      el.className='m-value';
+    }
+    // keep channel names as CH1-CH4, don't sync from server
+    document.getElementById('cc'+i).className='ch-conn-bar'+(ok?' on':'');
+    for(let j=0;j<4;j++){const u=document.getElementById('cu'+i+'_'+j);if(u)u.style.background=ok?C[j]:'#333';}
+    const btn=document.getElementById('cb'+i);
+    if(btn&&recState[i]===0){if(!ok){btn.disabled=true;btn.style.opacity='0.35'}else{btn.disabled=false;btn.style.opacity=''}}
+  }
+
+  if(d.recording)for(let i=0;i<4;i++){
+    const r=d.recording[i];if(!r||!r.active)continue;
+    if(recState[i]!==1)continue;
+    document.getElementById('ct'+i).textContent=r.elapsed||'00:00';
+    const ch=chs[i];
+    if(ch&&ch.connected){
+      dataStore[i].push({t:r.elapsed,V:ch.bus_voltage_V,A:ch.current_mA/1000,W:(ch.power_mW||0)/1000,C:ch.channel_temp_C});
+    }
+  }
+}
+
+function uc(){
+  if(!lastData)return;
+  for(let i=0;i<4;i++){
+    const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
+    const c=charts[i];if(!c)continue;
+    if(recState[i]!==1)continue;
+    const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
+    const pts=[];
+    for(let m=0;m<4;m++){
+      let v=raw[m];
+      if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
+      pts.push(v||0);
+    }
+    // Map elapsed mins to position; expand X axis if needed
+    const elapsed=lastData.recording[i]?.elapsed||'00:00';
+    const mm=parseInt(elapsed.split(':')[0])||0;
+    const pos=Math.min(mm,60);
+    const curMax=c.getOption().xAxis[0].max||10;
+    if(mm>curMax){
+      const X60=Array.from({length:61},(_,k)=>(k<10?'0':'')+k+':00');
+      c.setOption({xAxis:{data:X60.slice(0,mm+1),max:mm}},{notMerge:false});
+    }
+    const opts={series:[]};
+    for(let m=0;m<4;m++){
+      const data=[...c.getOption().series[m].data];
+      data[pos]=pts[m];
+      opts.series.push({data});
+    }
+    c.setOption(opts,{notMerge:false});
+  }
+}
+
+function tr(i){
+  if(!lastData||!lastData.channels[i].connected){toast('CH'+(i+1)+' offline');return;}
+  const btn=document.getElementById('cb'+i);
+
+  if(recState[i]===0){ // IDLE → START RECORDING
+    recState[i]=1;
+    document.getElementById('cr'+i).classList.add('recording');
+    document.getElementById('cr'+i).classList.remove('stopped');
+    btn.textContent='STOP';btn.className='btn-rec stop';
+    dataStore[i]=[];
+    document.getElementById('dts'+i).style.display='none';
+    document.getElementById('fi'+i).innerHTML='';
+    // Clear chart
+    if(charts[i]){
+      charts[i].setOption({series:[{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)}]});
+      lastNZ[i]=[0,0,0,0];
+    }
+    document.getElementById('rn'+i).textContent=pfx[i];
+    api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
+  }
+  else if(recState[i]===1){ // RECORDING → STOP
+    recState[i]=2;
+    document.getElementById('cr'+i).classList.remove('recording');
+    document.getElementById('cr'+i).classList.add('stopped');
+    btn.textContent='Reset';btn.className='btn-rec reset';
+    api('/api/channel/'+i+'/record/stop',{method:'POST'}).then(()=>{
+      // Fetch file list to find the newly created file
+      api('/api/files').then(d=>{
+        if(d&&d.length){
+          const latest=d[d.length-1]; // assume last file is ours
+          recFiles[i]=latest.name||'';
+          const fi=document.getElementById('fi'+i);
+          fi.innerHTML=' | '+recFiles[i]+
+            ' <a href="#" onclick="downloadCSV('+i+');return false" style="color:var(--accent);font-size:10px;text-decoration:none">Download</a>'+
+            ' <button onclick="delRecFile('+i+')" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:10px">Delete</button>';
+        }
+      });
+    });
+  }
+  else if(recState[i]===2){ // STOPPED → RESET
+    recState[i]=0;
+    document.getElementById('cr'+i).classList.remove('stopped');
+    btn.textContent='REC';btn.className='btn-rec go';
+    document.getElementById('ct'+i).textContent='00:00';
+    document.getElementById('fi'+i).innerHTML='';
+    document.getElementById('dts'+i).style.display='none';
+    document.getElementById('rn'+i).textContent=pfx[i];
+    dataStore[i]=[];
+    recFiles[i]='';
+    // Clear chart
+    if(charts[i]){
+      charts[i].setOption({series:[{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)}]});
+    }
+  }
+}
+
+function delRecFile(i){
+  if(!recFiles[i])return;
+  if(!confirm('Delete '+recFiles[i]+'?'))return;
+  api('/api/delete?file='+encodeURIComponent(recFiles[i]),{method:'POST'}).then(r=>{
+    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('Deleted');}
+    else toast('Delete failed');
+  });
+}
+
+function td(i){
+  const s=document.getElementById('dts'+i);
+  const show=s.style.display==='block';
+  s.style.display=show?'none':'block';
+  document.getElementById('cl'+i).innerHTML=show?'&#9660; Log':'&#9650; Log';
+}
+
+function openFiles(){document.getElementById('filesOverlay').classList.add('show');loadFiles();}
+function loadFiles(){
+  api('/api/files').then(d=>{
+    const el=document.getElementById('fileList');
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">No files ('+MAX_FILES+' max)</span>';return;}
+    el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' files</span>'+
+      d.map(f=>'<div class="file-row"><span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span><a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'">DL</a><button class="btn-del" onclick="if(confirm(\'Delete?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();else toast(\'Del fail\')})}">X</button></div>').join('');
+  });
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openAPI(){document.getElementById('apiOverlay').classList.add('show');}
+function openSettings(){
+  document.getElementById('settingsOverlay').classList.add('show');
+  api('/api/settings').then(d=>{
+    if(!d)return;
+    document.getElementById('setDevName').value=d.device_name||'';
+    document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
+    document.getElementById('setTz').value=d.tz_offset||8;
+  });
+}
+function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
+function saveWiFi(){
+  const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
+  api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
+}
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ── Download .dat → convert to CSV client-side ──
+async function downloadCSV(i){
+  if(!recFiles[i])return;
+  const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(recFiles[i]));
+  if(!resp.ok){toast('Download failed');return;}
+  const buf=await resp.arrayBuffer();
+  const v=new DataView(buf);
+  let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
+  for(let o=0;o<buf.byteLength;o+=24){
+    csv+=[
+      v.getUint32(o,true),
+      v.getFloat32(o+4,true).toFixed(3),
+      v.getFloat32(o+8,true).toFixed(3),
+      v.getFloat32(o+12,true).toFixed(3),
+      v.getFloat32(o+16,true).toFixed(1),
+      v.getFloat32(o+20,true).toFixed(1)
+    ].join(',')+'\n';
+  }
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=recFiles[i].replace('.dat','.csv');
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('CSV downloaded');
+}
+
+// ── Pull buffered data to fill chart after page refresh ──
+async function loadBufferData(i){
+  const d=await api('/api/channel/'+i+'/record/data');
+  if(!d||!d.length)return;
+  const c=charts[i];if(!c)return;
+  const opts={series:[]};
+  for(let m=0;m<4;m++){
+    const data=[...c.getOption().series[m].data];
+    const key=['V','A','W','C'][m];
+    d.forEach((p,j)=>{
+      const pos=Math.min(j,60);
+      data[pos]=parseFloat(p[key])||0;
+    });
+    opts.series.push({data});
+  }
+  c.setOption(opts,{notMerge:false});
+}
+</script>
+</body>
+</html>

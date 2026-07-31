@@ -1,0 +1,166 @@
+#include "config.h"
+
+DeviceSettings &DeviceSettings::getInstance() {
+  static DeviceSettings instance;
+  return instance;
+}
+
+DeviceSettings::DeviceSettings()
+    : _sample_interval_ms(1000), _temp_unit('C'), _tz_offset(8) {
+  memset(_device_name, 0, sizeof(_device_name));
+  memset(_channel_names, 0, sizeof(_channel_names));
+  memset(_wifi_ssid, 0, sizeof(_wifi_ssid));
+  memset(_wifi_password, 0, sizeof(_wifi_password));
+  memset(_ap_ssid, 0, sizeof(_ap_ssid));
+  memset(_ap_password, 0, sizeof(_ap_password));
+
+  // Defaults
+  strcpy(_device_name, "PowerMeter");
+  strcpy(_ap_ssid, "PowerMeter-4CH");
+  strcpy(_ap_password, "12345678");
+  for (int i = 0; i < 4; i++) {
+    snprintf(_channel_names[i], sizeof(_channel_names[i]), "CH%d", i + 1);
+  }
+}
+
+void DeviceSettings::begin() {
+  load();
+}
+
+void DeviceSettings::load() {
+  Preferences prefs;
+  if (!prefs.begin(NVS_NS, true)) {
+    Serial.println("[SET] NVS open failed, using defaults");
+    return;
+  }
+
+  String s;
+
+  s = prefs.getString("dev_name", "");
+  if (!s.isEmpty()) {
+    strncpy(_device_name, s.c_str(), sizeof(_device_name) - 1);
+  }
+
+  s = prefs.getString("ap_ssid", "");
+  if (!s.isEmpty()) {
+    strncpy(_ap_ssid, s.c_str(), sizeof(_ap_ssid) - 1);
+  }
+
+  s = prefs.getString("ap_pass", "");
+  if (!s.isEmpty()) {
+    strncpy(_ap_password, s.c_str(), sizeof(_ap_password) - 1);
+  }
+
+  s = prefs.getString("wifi_ssid", "");
+  if (!s.isEmpty()) {
+    strncpy(_wifi_ssid, s.c_str(), sizeof(_wifi_ssid) - 1);
+  }
+
+  s = prefs.getString("wifi_pass", "");
+  if (!s.isEmpty()) {
+    strncpy(_wifi_password, s.c_str(), sizeof(_wifi_password) - 1);
+  }
+
+  for (int i = 0; i < 4; i++) {
+    char key[8];
+    snprintf(key, sizeof(key), "ch%d_name", i);
+    s = prefs.getString(key, "");
+    if (!s.isEmpty()) {
+      strncpy(_channel_names[i], s.c_str(), sizeof(_channel_names[i]) - 1);
+    }
+  }
+
+  _sample_interval_ms = prefs.getUInt("sample_ms", 1000);
+  _temp_unit = prefs.getChar("temp_unit", 'C');
+  _tz_offset = prefs.getChar("tz_offset", 8);
+
+  prefs.end();
+
+  Serial.println("[SET] Settings loaded from NVS");
+  Serial.printf("  Device: %s\n", _device_name);
+  Serial.printf("  AP: %s / %s\n", _ap_ssid, _ap_password);
+  for (int i = 0; i < 4; i++) {
+    Serial.printf("  CH%d: %s\n", i + 1, _channel_names[i]);
+  }
+  Serial.printf("  Sample interval: %lu ms\n", _sample_interval_ms);
+  Serial.printf("  Temp unit: %c\n", _temp_unit);
+}
+
+void DeviceSettings::save() {
+  Preferences prefs;
+  if (!prefs.begin(NVS_NS, false)) {
+    Serial.println("[SET] NVS open for write failed!");
+    return;
+  }
+
+  prefs.putString("dev_name", _device_name);
+  prefs.putString("ap_ssid", _ap_ssid);
+  prefs.putString("ap_pass", _ap_password);
+  prefs.putString("wifi_ssid", _wifi_ssid);
+  prefs.putString("wifi_pass", _wifi_password);
+
+  for (int i = 0; i < 4; i++) {
+    char key[8];
+    snprintf(key, sizeof(key), "ch%d_name", i);
+    prefs.putString(key, _channel_names[i]);
+  }
+
+  prefs.putUInt("sample_ms", _sample_interval_ms);
+  prefs.putChar("temp_unit", _temp_unit);
+  prefs.putChar("tz_offset", _tz_offset);
+
+  prefs.end();
+  Serial.println("[SET] Settings saved to NVS");
+}
+
+// ---- Setters with immediate NVS write ----
+
+void DeviceSettings::setDeviceName(const char *name) {
+  strncpy(_device_name, name, sizeof(_device_name) - 1);
+  _device_name[sizeof(_device_name) - 1] = '\0';
+}
+
+void DeviceSettings::setChannelName(int ch, const char *name) {
+  if (ch < 0 || ch > 3) return;
+  strncpy(_channel_names[ch], name, sizeof(_channel_names[ch]) - 1);
+  _channel_names[ch][sizeof(_channel_names[ch]) - 1] = '\0';
+}
+
+const char *DeviceSettings::channelName(int ch) const {
+  if (ch < 0 || ch > 3) return "CH?";
+  return _channel_names[ch];
+}
+
+void DeviceSettings::setWiFi(const char *ssid, const char *password) {
+  strncpy(_wifi_ssid, ssid, sizeof(_wifi_ssid) - 1);
+  _wifi_ssid[sizeof(_wifi_ssid) - 1] = '\0';
+  strncpy(_wifi_password, password, sizeof(_wifi_password) - 1);
+  _wifi_password[sizeof(_wifi_password) - 1] = '\0';
+}
+
+void DeviceSettings::setAPPassword(const char *pass) {
+  strncpy(_ap_password, pass, sizeof(_ap_password) - 1);
+  _ap_password[sizeof(_ap_password) - 1] = '\0';
+}
+
+void DeviceSettings::setAPSSID(const char *ssid) {
+  strncpy(_ap_ssid, ssid, sizeof(_ap_ssid) - 1);
+  _ap_ssid[sizeof(_ap_ssid) - 1] = '\0';
+}
+
+void DeviceSettings::setSampleIntervalMs(uint32_t ms) {
+  if (ms < 100) ms = 100;
+  if (ms > 60000) ms = 60000;
+  _sample_interval_ms = ms;
+}
+
+void DeviceSettings::setTempUnit(char unit) {
+  if (unit == 'F' || unit == 'f') _temp_unit = 'F';
+  else _temp_unit = 'C';
+}
+
+void DeviceSettings::setTzOffset(int8_t off) {
+  if (off < -12) off = -12;
+  if (off > 14) off = 14;
+  _tz_offset = off;
+}
