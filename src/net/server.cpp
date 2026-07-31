@@ -6,6 +6,7 @@
 #include "../app/measure.h"
 #include "../app/record.h"
 #include "../app/config.h"
+#include "../version.h"
 #include "../hal/channel.h"
 #include "../hal/buzzer.h"
 
@@ -464,6 +465,7 @@ static void handleSettings(AsyncWebServerRequest *request) {
   doc["temp_unit"] = String(cfg.tempUnit());
   doc["tz_offset"] = cfg.tzOffset();
   doc["rotation"] = cfg.rotation();
+  doc["version"] = FIRMWARE_VERSION;
 
   // Stop conditions per channel
   JsonArray sc_arr = doc["stop_cond"].to<JsonArray>();
