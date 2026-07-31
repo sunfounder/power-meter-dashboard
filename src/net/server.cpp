@@ -305,6 +305,7 @@ static void handleStatus(AsyncWebServerRequest *request) {
   doc["timestamp"] = time(nullptr);  // real epoch time
   doc["any_recording"] = recorder.isAnyRecording();
   doc["ambient_temp_C"] = snap.env.ambient_temp_C;
+  doc["temp_unit"] = String(cfg.tempUnit());
 
   JsonArray ch_arr = doc["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {
