@@ -125,6 +125,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <!-- rotation hidden until LVGL driver supports it -->
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button></div>
     <div style="text-align:center;font-size:10px;color:var(--dim);margin-top:8px" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:10px;color:#444">Dashboard v1.1</div>
@@ -576,6 +577,15 @@ function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
 function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
 function convTemp(c){return tempUnit==='F'?c*9/5+32:c;}
 function ut(){return tempUnit==='F'?'F':'C';}
+function calibrateAmbTemp(){
+  const real=parseFloat(document.getElementById('calTemp').value);
+  if(isNaN(real)){toast('输入实际温度');return;}
+  if(!lastData||lastData.ambient_temp_C==null){toast('无温度数据');return;}
+  const offset=(real-lastData.ambient_temp_C).toFixed(1);
+  api('/api/settings',{method:'POST',body:new URLSearchParams({amb_temp_offset:offset})}).then(()=>{
+    toast('校准完成，偏移: '+offset+'°C');
+  });
+}
 function saveWiFi(){
   const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
   api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
