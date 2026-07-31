@@ -393,8 +393,11 @@ static void handleSettings(AsyncWebServerRequest *request) {
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
-    if (request->hasParam("tz_offset", true)) {
-      cfg.setTzOffset(
+    if (request->hasParam("rotation", true)) {
+      cfg.setRotation(request->getParam("rotation", true)->value().toInt());
+      updated = true;
+    }
+    if (request->hasParam("tz_offset", true)) {      cfg.setTzOffset(
         request->getParam("tz_offset", true)->value().toInt()
       );
       updated = true;
@@ -421,6 +424,7 @@ static void handleSettings(AsyncWebServerRequest *request) {
   doc["sample_interval_ms"] = cfg.sampleIntervalMs();
   doc["temp_unit"] = String(cfg.tempUnit());
   doc["tz_offset"] = cfg.tzOffset();
+  doc["rotation"] = cfg.rotation();
 
   // Computed AP SSID: device_name + "-" + last 3 bytes of MAC
   uint8_t mac[6];

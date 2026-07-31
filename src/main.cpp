@@ -143,6 +143,7 @@ void setup() {
                          LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_user_data(d, display_get_panel_handle());
   lv_display_set_flush_cb(d, lvgl_flush_cb);
+  lv_display_set_rotation(d, (lv_display_rotation_t)(DeviceSettings::getInstance().rotation() / 90));
   _lv_disp = d;
   display_set_on_flush_ready(on_i80_flush_ready);
   lv_group_create();

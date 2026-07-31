@@ -111,6 +111,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>AP Password</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">Save</button></div></div>
     <div class="section"><label>Timezone</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <div class="section"><label>Chart X min (min)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
+    <div class="section"><label>Display Rotation</label><select id="setRot" onchange="saveSet('rotation',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
     <div class="section"><label>WiFi STA</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">Connect</button></div></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('Restart?'))api('/api/restart',{method:'POST'})">Restart</button></div>
   </div>
@@ -234,7 +235,7 @@ function ic(i){
   c.setOption({
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true},
-    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:14,bottom:2,borderColor:'#333',backgroundColor:'#111',fillerColor:'rgba(226,112,5,0.2)'}],
+    dataZoom:[{type:'inside',start:0,end:100}],
     xAxis:{type:'value',min:0,max:getXMin()*60,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
       {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
@@ -428,6 +429,7 @@ function openSettings(){
     document.getElementById('setDevName').value=d.device_name||'';
     document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
     document.getElementById('setTz').value=d.tz_offset||8;
+    document.getElementById('setRot').value=d.rotation||0;
   });
 }
 function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}

@@ -49,6 +49,10 @@ public:
   int8_t tzOffset() const { return _tz_offset; }
   void setTzOffset(int8_t off);
 
+  // Display rotation (0/90/180/270)
+  uint16_t rotation() const { return _rotation; }
+  void setRotation(uint16_t r);
+
 private:
   DeviceSettings();
 
@@ -62,5 +66,6 @@ private:
   char _ap_password[32];
   uint32_t _sample_interval_ms;
   char _temp_unit;  // 'C' or 'F'
-  int8_t _tz_offset; // hours from UTC, default 8 (China)
+  int8_t _tz_offset;
+  uint16_t _rotation;  // 0, 90, 180, 270 // hours from UTC, default 8 (China)
 };

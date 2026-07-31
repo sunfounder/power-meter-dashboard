@@ -6,7 +6,7 @@ DeviceSettings &DeviceSettings::getInstance() {
 }
 
 DeviceSettings::DeviceSettings()
-    : _sample_interval_ms(1000), _temp_unit('C'), _tz_offset(8) {
+    : _sample_interval_ms(1000), _temp_unit('C'), _tz_offset(8), _rotation(0) {
   memset(_device_name, 0, sizeof(_device_name));
   memset(_channel_names, 0, sizeof(_channel_names));
   memset(_wifi_ssid, 0, sizeof(_wifi_ssid));
@@ -73,6 +73,7 @@ void DeviceSettings::load() {
   _sample_interval_ms = prefs.getUInt("sample_ms", 1000);
   _temp_unit = prefs.getChar("temp_unit", 'C');
   _tz_offset = prefs.getChar("tz_offset", 8);
+  _rotation  = prefs.getUShort("rotation", 0);
 
   prefs.end();
 
@@ -108,6 +109,7 @@ void DeviceSettings::save() {
   prefs.putUInt("sample_ms", _sample_interval_ms);
   prefs.putChar("temp_unit", _temp_unit);
   prefs.putChar("tz_offset", _tz_offset);
+  prefs.putUShort("rotation", _rotation);
 
   prefs.end();
   Serial.println("[SET] Settings saved to NVS");
@@ -163,4 +165,9 @@ void DeviceSettings::setTzOffset(int8_t off) {
   if (off < -12) off = -12;
   if (off > 14) off = 14;
   _tz_offset = off;
+}
+
+void DeviceSettings::setRotation(uint16_t r) {
+  if (r != 90 && r != 180 && r != 270) r = 0;
+  _rotation = r;
 }
