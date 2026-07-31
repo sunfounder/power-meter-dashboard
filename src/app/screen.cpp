@@ -330,12 +330,12 @@ static void scope_timer_cb(lv_timer_t *) {
   static int sc=0;
   if(++sc%20==0) Serial.printf("[SCOPE] CH%d V=%.2f A=%.3f\n", _scope_ch+1, s.bus_voltage_V, s.current_mA/1000.0f);
   if (_scope_lbl_v) {
-    char buf[20];
-    snprintf(buf, sizeof(buf), "%.2fV", s.bus_voltage_V);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.2f", s.bus_voltage_V);
     lv_label_set_text(_scope_lbl_v, buf);
-    snprintf(buf, sizeof(buf), "%.3fA", s.current_mA/1000.0f);
+    snprintf(buf, sizeof(buf), "%.3f", s.current_mA/1000.0f);
     lv_label_set_text(_scope_lbl_a, buf);
-    snprintf(buf, sizeof(buf), "%.2fW", s.power_mW/1000.0f);
+    snprintf(buf, sizeof(buf), "%.2f", s.power_mW/1000.0f);
     lv_label_set_text(_scope_lbl_w, buf);
   }
 }
@@ -370,21 +370,21 @@ void power_meter_scope_show() {
   lv_obj_set_style_border_width(bar, 0, 0);
   lv_obj_set_style_pad_all(bar, 0, 0);
   lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  // CH badge (dark gray, distinct from V)
+  // CH badge (dark gray)
   char lbl[8]; snprintf(lbl, 8, "CH%d", _scope_ch+1);
   lv_obj_t *t = lv_label_create(bar);
   lv_label_set_text(t, lbl);
   lv_obj_set_style_text_color(t, lv_color_white(), 0);
   lv_obj_set_style_bg_color(t, lv_color_hex(0x333333), 0);
   lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
-  lv_obj_set_style_pad_hor(t, 8, 0);
+  lv_obj_set_style_pad_hor(t, 6, 0);
   lv_obj_set_style_pad_ver(t, 2, 0);
   lv_obj_set_style_radius(t, 3, 0);
-  lv_obj_set_width(t, 45);
+  lv_obj_set_width(t, 52);
 
-  // V badge
+  // V badge: value + unit separate
   _scope_lbl_v = lv_label_create(bar);
   lv_obj_set_style_text_color(_scope_lbl_v, lv_color_white(), 0);
   lv_obj_set_style_bg_color(_scope_lbl_v, lv_color_hex(0xE27005), 0);
@@ -392,9 +392,9 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_v, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_v, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_v, 3, 0);
-  lv_obj_set_width(_scope_lbl_v, 66);
-  lv_obj_set_style_text_align(_scope_lbl_v, LV_TEXT_ALIGN_CENTER, 0);
-  lv_label_set_text(_scope_lbl_v, "0.00V");
+  lv_obj_set_width(_scope_lbl_v, 60);
+  lv_obj_set_style_text_align(_scope_lbl_v, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_label_set_text(_scope_lbl_v, "0.00");
 
   // A badge
   _scope_lbl_a = lv_label_create(bar);
@@ -404,9 +404,9 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_a, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_a, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_a, 3, 0);
-  lv_obj_set_width(_scope_lbl_a, 69);
-  lv_obj_set_style_text_align(_scope_lbl_a, LV_TEXT_ALIGN_CENTER, 0);
-  lv_label_set_text(_scope_lbl_a, "0.000A");
+  lv_obj_set_width(_scope_lbl_a, 60);
+  lv_obj_set_style_text_align(_scope_lbl_a, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_label_set_text(_scope_lbl_a, "0.000");
 
   // W badge
   _scope_lbl_w = lv_label_create(bar);
@@ -416,9 +416,20 @@ void power_meter_scope_show() {
   lv_obj_set_style_pad_hor(_scope_lbl_w, 6, 0);
   lv_obj_set_style_pad_ver(_scope_lbl_w, 2, 0);
   lv_obj_set_style_radius(_scope_lbl_w, 3, 0);
-  lv_obj_set_width(_scope_lbl_w, 66);
-  lv_obj_set_style_text_align(_scope_lbl_w, LV_TEXT_ALIGN_CENTER, 0);
-  lv_label_set_text(_scope_lbl_w, "0.00W");
+  lv_obj_set_width(_scope_lbl_w, 60);
+  lv_obj_set_style_text_align(_scope_lbl_w, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_label_set_text(_scope_lbl_w, "0.00");
+
+  // Unit labels (no bg, just text)
+  lv_obj_t *uv = lv_label_create(bar);
+  lv_label_set_text(uv, "V");
+  lv_obj_set_style_text_color(uv, lv_color_hex(0xE27005), 0);
+  lv_obj_t *ua = lv_label_create(bar);
+  lv_label_set_text(ua, "A");
+  lv_obj_set_style_text_color(ua, lv_color_hex(0x3CB84C), 0);
+  lv_obj_t *uw = lv_label_create(bar);
+  lv_label_set_text(uw, "W");
+  lv_obj_set_style_text_color(uw, lv_color_hex(0x4895EF), 0);
 
   _scope_timer = lv_timer_create(scope_timer_cb, 10, nullptr);
 }
