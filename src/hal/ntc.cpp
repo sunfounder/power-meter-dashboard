@@ -33,6 +33,8 @@ float NTC_B3950::resistanceToTemp(float resistance) {
 }
 
 float NTC_B3950::voltageToTemp(float voltage) {
+  // Open-circuit / not-connected detection
+  if (voltage < 0.01f || voltage > _v_ref - 0.01f) return -999.0f;
   float resistance = voltageToResistance(voltage);
   return resistanceToTemp(resistance);
 }

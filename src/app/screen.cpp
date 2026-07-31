@@ -139,7 +139,7 @@ static void refresh_card(int ch) {
     lv_label_set_text(_val_labels[ch][2], buf);
     float tc = DeviceSettings::getInstance().tempUnit()=='F' ? s.channel_temp_C * 9/5 + 32 : s.channel_temp_C;
     snprintf(buf, sizeof(buf), "%.1f", tc);
-    lv_label_set_text(_val_labels[ch][3], buf);
+    lv_label_set_text(_val_labels[ch][3], s.channel_temp_C < -100 ? "---" : buf);
     // Update unit label
     lv_label_set_text(_unit_labels[ch][3], DeviceSettings::getInstance().tempUnit()=='F' ? "F" : "C");
   }
