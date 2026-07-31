@@ -36,7 +36,6 @@ float NTC_B3950::voltageToTemp(float voltage) {
   float resistance = voltageToResistance(voltage);
   // Detect open circuit: resistance out of reasonable range
   if (resistance < 50 || resistance > 1000000) {
-    Serial.printf("[NTC] disconnected: V=%.2f R=%.0f\n", voltage, resistance);
     return -999.0f;
   }
   return resistanceToTemp(resistance);

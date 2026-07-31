@@ -127,6 +127,8 @@ float MeasurementEngine::_readAmbientTemp() {
   float raw_avg = (float)sum / 16.0f;
   float voltage = raw_avg * 3.3f / 4095.0f;
   float temp = _ntc.voltageToTemp(voltage);
+  static int acnt=0;
+  if(++acnt%10==0) Serial.printf("[AMB] ADC=%.0f V=%.3f temp=%.1f\n", raw_avg, voltage, temp);
   return temp + AMB_NTC_CALIB_OFFSET;
 }
 
