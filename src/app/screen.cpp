@@ -134,8 +134,11 @@ static void refresh_card(int ch) {
     lv_label_set_text(_val_labels[ch][1], buf);
     snprintf(buf, sizeof(buf), "%.2f", s.power_mW / 1000.0f);
     lv_label_set_text(_val_labels[ch][2], buf);
-    snprintf(buf, sizeof(buf), "%.1f", s.channel_temp_C);
+    float tc = DeviceSettings::getInstance().tempUnit()=='F' ? s.channel_temp_C * 9/5 + 32 : s.channel_temp_C;
+    snprintf(buf, sizeof(buf), "%.1f", tc);
     lv_label_set_text(_val_labels[ch][3], buf);
+    // Update unit label
+    lv_label_set_text(_unit_labels[ch][3], DeviceSettings::getInstance().tempUnit()=='F' ? "F" : "C");
   }
 
   // Connection bar color
@@ -159,7 +162,9 @@ static void refresh_status_bar() {
   auto &snap = MeasurementEngine::getInstance().getLatest();
   char buf[32];
 
-  snprintf(buf, sizeof(buf), "%.1f'C", snap.env.ambient_temp_C);
+  snprintf(buf, sizeof(buf), "%.1f'%c",
+    DeviceSettings::getInstance().tempUnit()=='F' ? snap.env.ambient_temp_C * 9/5 + 32 : snap.env.ambient_temp_C,
+    DeviceSettings::getInstance().tempUnit());
   lv_label_set_text(_ambient_label, buf);
 
   if (WiFi.status() == WL_CONNECTED) {

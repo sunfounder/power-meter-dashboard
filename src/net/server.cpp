@@ -246,6 +246,7 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
 
   // Aggregate
   data["any_recording"] = recorder.isAnyRecording();
+  data["temp_unit"] = String(DeviceSettings::getInstance().tempUnit());
 
   String json;
   serializeJson(doc, json);
@@ -400,7 +401,10 @@ static void handleSettings(AsyncWebServerRequest *request) {
       uint16_t r = request->getParam("rotation", true)->value().toInt();
       cfg.setRotation(r);
       // Apply rotation live
-      if (g_lv_disp) lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
+      if (g_lv_disp) {
+        lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
+        lv_refr_now(NULL);
+      }
       updated = true;
     }
     if (request->hasParam("tz_offset", true)) {      cfg.setTzOffset(
