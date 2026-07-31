@@ -615,6 +615,7 @@ async function downloadCSV(i){
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
+  console.log('loadBuffer CH'+(i+1)+': dataLen='+(d?d.length:0));
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
   // Total samples from status; buffer has only last N
