@@ -179,6 +179,7 @@ let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],p
 let recState=[0,0,0,0]; // 0=idle, 1=recording, 2=stopped
 let recFiles=['','','',''];
 let recStart=[0,0,0,0];
+let sampleCount=[0,0,0,0]; // X axis: sample index, buffer+live aligned
 let tempUnit='C';
 let stopCh=-1;
 const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
@@ -350,7 +351,7 @@ function poll(){
       const r=d.recording[i];if(!r)continue;
       if(r.active && recState[i]===0){
         recState[i]=1;
-        // recStart set by loadBufferData from real timestamps
+        sampleCount[i]=r.samples||0;
         document.getElementById('cr'+i).classList.add('recording');
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
@@ -430,11 +431,11 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
-    const elapsed=(Date.now()-recStart[i])/1000;
+    const idx=sampleCount[i]++;
     const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([elapsed,pts[m]]);
+      data.push([idx,pts[m]]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
@@ -446,7 +447,7 @@ function tr(i){
   const btn=document.getElementById('cb'+i);
 
   if(recState[i]===0){ // IDLE → START RECORDING
-    recState[i]=1;recStart[i]=Date.now();
+    recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;
     document.getElementById('cr'+i).classList.add('recording');
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='STOP';btn.className='btn-rec stop';
@@ -615,6 +616,7 @@ async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
+  sampleCount[i]=d.length;
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
