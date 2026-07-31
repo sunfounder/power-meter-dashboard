@@ -357,7 +357,7 @@ void power_meter_scope_show() {
   lv_chart_set_type(_scope_chart, LV_CHART_TYPE_LINE);
   lv_chart_set_point_count(_scope_chart, 500);
   lv_chart_set_range(_scope_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 10);
-  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_SECONDARY_Y, 0, 5);
+  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_SECONDARY_Y, -5, 5);
   lv_chart_set_div_line_count(_scope_chart, 5, 4);
 
   _scope_ser_v = lv_chart_add_series(_scope_chart, lv_color_hex(0xE27005), LV_CHART_AXIS_PRIMARY_Y);
