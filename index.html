@@ -138,10 +138,10 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 <div class="modal-overlay" id="stopOverlay">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">自动停止条件</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
-    <div class="section"><label>电压低于 (0=禁用)</label><input type="number" id="stopV" value="0.5" step="0.1" min="0"></div>
-    <div class="section"><label>电流低于 (0=禁用)</label><input type="number" id="stopA" value="0.01" step="0.001" min="0"></div>
-    <div class="section"><label>最大时间 (0=禁用)</label><input type="number" id="stopH" value="8" step="0.5" min="0"></div>
-    <div class="section"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="stopFall" checked> 下降沿</label></div>
+    <div class="section"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="stopEnV"> 电压低于</label><input type="number" id="stopV" value="0.5" step="0.1" min="0"></div>
+    <div class="section"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="stopEnA"> 电流低于</label><input type="number" id="stopA" value="0.01" step="0.001" min="0"></div>
+    <div class="section"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="stopEnH"> 最大时间</label><input type="number" id="stopH" value="8" step="0.5" min="0"></div>
+    <div class="section"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="stopEnF"> 下降沿模式</label><span style="font-size:10px;color:var(--dim)">(先高于阈值×1.2再降下来)</span></div>
     <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">保存</button>
   </div>
 </div>
@@ -220,20 +220,23 @@ function toggleStopPanel(i){stopCh=i;
   api('/api/settings').then(d=>{
     if(!d||!d.stop_cond)return;
     const sc=d.stop_cond[i];
+    document.getElementById('stopEnV').checked=sc.v>0;
     document.getElementById('stopV').value=sc.v||0.5;
+    document.getElementById('stopEnA').checked=sc.mA>0;
     document.getElementById('stopA').value=(sc.mA/1000).toFixed(3)||0.01;
+    document.getElementById('stopEnH').checked=sc.min>0;
     document.getElementById('stopH').value=(sc.min/60)||8;
-    document.getElementById('stopFall').checked=sc.fall;
+    document.getElementById('stopEnF').checked=sc.falling_edge;
   });
   document.getElementById('stopOverlay').classList.add('show');
 }
 function saveStopCond(){
   if(stopCh<0)return;
-  const v=document.getElementById('stopV').value;
-  const a=parseFloat(document.getElementById('stopA').value);
-  const h=parseFloat(document.getElementById('stopH').value);
-  const fall=document.getElementById('stopFall').checked?'1':'0';
-  const en=(parseFloat(v)>0||a>0||h>0)?'1':'0';
+  const v=document.getElementById('stopEnV').checked?parseFloat(document.getElementById('stopV').value):0;
+  const a=document.getElementById('stopEnA').checked?parseFloat(document.getElementById('stopA').value):0;
+  const h=document.getElementById('stopEnH').checked?parseFloat(document.getElementById('stopH').value):0;
+  const fall=document.getElementById('stopEnF').checked?'1':'0';
+  const en=(v>0||a>0||h>0)?'1':'0';
   api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:stopCh,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall})});
 }
 function loadStopCond(i){
