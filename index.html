@@ -347,6 +347,11 @@ function poll(){
     if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
     lastData=d;document.getElementById('connDot').className='conn-dot';
     if(d.temp_unit){tempUnit=d.temp_unit;}
+    // Highlight scope channel
+    for(let i=0;i<4;i++){
+      const cr=document.getElementById('cr'+i);
+      if(cr)cr.style.borderColor=d.scope_ch>=0&&d.scope_ch==i?'#e27005':'';
+    }
 
     // Recover recording state after page refresh
     if(d.recording)for(let i=0;i<4;i++){
