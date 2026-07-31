@@ -394,7 +394,8 @@ function up(){
       const el=document.getElementById('cv'+i+'_'+j);if(!el)continue;
       if(!ok){el.textContent='---';el.className='m-value dim';continue;}
       let raw=ch[MKEYS[j]];if(raw==null||isNaN(raw))raw=0;
-      if(j===3)raw=convTemp(raw); // channel temp
+      if(j===3&&raw<-100){el.textContent='---';el.className='m-value dim';continue;}
+      if(j===3)raw=convTemp(raw);
       el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?(raw/1000).toFixed(3):raw.toFixed(1));
       el.className='m-value';
     }
@@ -617,6 +618,7 @@ async function loadBufferData(i){
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
   sampleCount[i]=d.length;
+  dataStore[i]=d.map(p=>({t:'--',V:p.V,A:p.A,W:p.W,C:p.C}));
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
