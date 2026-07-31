@@ -310,7 +310,7 @@ function updateTables(){
 function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
-  document.getElementById('ambTemp').textContent='Amb: '+convTemp(d.ambient_temp_C||0).toFixed(1)+' '+ut();
+  document.getElementById('ambTemp').textContent=convTemp(d.ambient_temp_C||0).toFixed(1)+' '+ut();
   if(d.timestamp){
     const dt=new Date(d.timestamp*1000);
     document.getElementById('pageTime').textContent=
