@@ -241,14 +241,15 @@ function saveRecName(i){
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
-  const now=Math.floor(Date.now()/1000);
   c.setOption({
     grid:{left:10,right:10,top:8,bottom:25},
-    tooltip:{trigger:'axis',confine:true},
+    tooltip:{trigger:'axis',confine:true,formatter:params=>{
+      let t='';const v=params[0].value[0];const m=Math.floor(v/60);const s=v%60;t=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+'<br/>';
+      params.forEach(p=>{t+=p.marker+' '+p.seriesName+': '+p.value[1].toFixed(3)+'<br/>';});
+      return t;
+    }},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',min:now-600,max:now,axisLabel:{color:'#555',fontSize:8,formatter:v=>{
-      const dt=new Date(v*1000);return ('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)+':'+('0'+dt.getSeconds()).slice(-2);
-    }}},
+    xAxis:{type:'value',min:0,max:600,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
       {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
@@ -342,12 +343,10 @@ function up(){
 
 function uc(){
   if(!lastData)return;
-  const ts=lastData.timestamp||Math.floor(Date.now()/1000); // UNIX seconds
   for(let i=0;i<4;i++){
     const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
     const c=charts[i];if(!c)continue;
     if(recState[i]!==1)continue;
-    if(!recStart[i])recStart[i]=ts*1000;
     const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
     const pts=[];
     for(let m=0;m<4;m++){
@@ -355,10 +354,11 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
+    const elapsed=(Date.now()-recStart[i])/1000;
     const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([ts,pts[m]]);
+      data.push([elapsed,pts[m]]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
@@ -509,13 +509,10 @@ async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
-  // Use real timestamps from buffer to align X axis
-  const firstT=d[0].t; // UNIX seconds of first sample
-  recStart[i]=Date.now()-(d[d.length-1].t-firstT)*1000; // back-calculate start time
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map(p=>[p.t-firstT,parseFloat(p[key])||0]);
+    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
