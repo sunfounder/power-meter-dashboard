@@ -616,11 +616,14 @@ async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/data');
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
-  sampleCount[i]=d.length;
+  // Total samples from status; buffer has only last N
+  const totalSamples=(lastData&&lastData.recording&&lastData.recording[i])?lastData.recording[i].samples:d.length;
+  const base=Math.max(0,totalSamples-d.length);
+  sampleCount[i]=totalSamples;
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
+    const data=d.map((p,j)=>[base+j,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
