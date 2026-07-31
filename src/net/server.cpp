@@ -35,6 +35,17 @@ static void handleDownload(AsyncWebServerRequest *request);
 static void handleDeleteFile(AsyncWebServerRequest *request);
 static void handleWifiConfig(AsyncWebServerRequest *request);
 static void handleChannelRecordData(AsyncWebServerRequest *request);
+
+// GET /api/storage — LittleFS space info
+static void handleStorage(AsyncWebServerRequest *request) {
+  JsonDocument doc;
+  doc["total_kb"]  = LittleFS.totalBytes() / 1024;
+  doc["used_kb"]   = LittleFS.usedBytes() / 1024;
+  doc["free_kb"]   = (LittleFS.totalBytes() - LittleFS.usedBytes()) / 1024;
+  String json;
+  serializeJson(doc, json);
+  request->send(200, "application/json", json);
+}
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data, size_t len);
 
@@ -764,6 +775,7 @@ void PowerMeterWebServer::setupRoutes() {
   _server.on("/api/settings", HTTP_GET, handleSettings);
   _server.on("/api/settings", HTTP_POST, handleSettings);
   _server.on("/api/files", HTTP_GET, handleListFiles);
+  _server.on("/api/storage", HTTP_GET, handleStorage);
   _server.on("/api/download", HTTP_GET, handleDownload);
   _server.on("/api/delete", HTTP_POST, handleDeleteFile);
   _server.on("/api/wifi", HTTP_POST, handleWifiConfig);
