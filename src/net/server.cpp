@@ -36,6 +36,7 @@ static void handleDownload(AsyncWebServerRequest *request);
 static void handleDeleteFile(AsyncWebServerRequest *request);
 static void handleWifiConfig(AsyncWebServerRequest *request);
 static void handleChannelRecordData(AsyncWebServerRequest *request);
+static void handleChannelRecordAll(AsyncWebServerRequest *request);
 
 // GET /api/storage — LittleFS space info
 static void handleStorage(AsyncWebServerRequest *request) {
@@ -536,8 +537,8 @@ static void handleChannelRecordStart(AsyncWebServerRequest *request) {
   Serial.println("[REC] handler done");
 }
 
-// GET /api/channel/<ch>/record/data  — buffered samples as JSON
-static void handleChannelRecordData(AsyncWebServerRequest *request) {
+// GET /api/channel/<ch>/record/all — all data from .dat + buffer
+static void handleChannelRecordAll(AsyncWebServerRequest *request) {
   int ch = parseChannelFromUrl(request->url());
   if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
 
@@ -545,9 +546,31 @@ static void handleChannelRecordData(AsyncWebServerRequest *request) {
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
 
+  // 1. Read from .dat file (already flushed samples)
+  const char *fname = rec.currentFilename(ch);
+  if (fname && fname[0] && LittleFS.exists(fname)) {
+    File f = LittleFS.open(fname);
+    if (f) {
+      size_t sz = f.size();
+      int n = sz / sizeof(SampleBin);
+      for (int i = 0; i < n; i++) {
+        SampleBin b;
+        if (f.read((uint8_t *)&b, sizeof(SampleBin)) != sizeof(SampleBin)) break;
+        JsonObject o = arr.add<JsonObject>();
+        o["t"] = b.timestamp;
+        o["V"] = serialized(String(b.bus_voltage_V, 3));
+        o["A"] = serialized(String(b.current_A, 3));
+        o["W"] = serialized(String(b.power_W, 3));
+        o["C"] = serialized(String(b.channel_temp_C, 1));
+      }
+      f.close();
+    }
+  }
+
+  // 2. Append buffered (not yet flushed) samples
   uint16_t head = rec.bufferHead(ch);
   uint16_t cnt  = rec.bufferCount(ch);
-  int start = (head - cnt + 60) % 60;  // BUF_ROWS=60
+  int start = (head - cnt + 60) % 60;
   for (uint16_t i = 0; i < cnt; i++) {
     int idx = (start + i) % 60;
     const SampleBin &b = rec.bufferData(ch)[idx];
@@ -558,8 +581,31 @@ static void handleChannelRecordData(AsyncWebServerRequest *request) {
     o["W"] = serialized(String(b.power_W, 3));
     o["C"] = serialized(String(b.channel_temp_C, 1));
   }
+
   String json;
   serializeJson(doc, json);
+  request->send(200, "application/json", json);
+}
+
+// GET /api/channel/<ch>/record/data  — buffered samples only
+static void handleChannelRecordData(AsyncWebServerRequest *request) {
+  int ch = parseChannelFromUrl(request->url());
+  if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
+  auto &rec = DataRecorder::getInstance();
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
+  uint16_t head = rec.bufferHead(ch), cnt = rec.bufferCount(ch);
+  int start = (head - cnt + 60) % 60;
+  for (uint16_t i = 0; i < cnt; i++) {
+    const SampleBin &b = rec.bufferData(ch)[(start + i) % 60];
+    JsonObject o = arr.add<JsonObject>();
+    o["t"] = b.timestamp;
+    o["V"] = serialized(String(b.bus_voltage_V, 3));
+    o["A"] = serialized(String(b.current_A, 3));
+    o["W"] = serialized(String(b.power_W, 3));
+    o["C"] = serialized(String(b.channel_temp_C, 1));
+  }
+  String json; serializeJson(doc, json);
   request->send(200, "application/json", json);
 }
 
@@ -822,6 +868,10 @@ void PowerMeterWebServer::setupRoutes() {
   _server.on("/api/channel/1/record/data",  HTTP_GET, handleChannelRecordData);
   _server.on("/api/channel/2/record/data",  HTTP_GET, handleChannelRecordData);
   _server.on("/api/channel/3/record/data",  HTTP_GET, handleChannelRecordData);
+  _server.on("/api/channel/0/record/all",   HTTP_GET, handleChannelRecordAll);
+  _server.on("/api/channel/1/record/all",   HTTP_GET, handleChannelRecordAll);
+  _server.on("/api/channel/2/record/all",   HTTP_GET, handleChannelRecordAll);
+  _server.on("/api/channel/3/record/all",   HTTP_GET, handleChannelRecordAll);
   _server.on("/api/channel/0/name",         HTTP_POST, handleChannelRename);
   _server.on("/api/channel/1/name",         HTTP_POST, handleChannelRename);
   _server.on("/api/channel/2/name",         HTTP_POST, handleChannelRename);
