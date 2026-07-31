@@ -98,9 +98,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <div class="right">
     <span class="ambient" id="ambTemp">Amb: --.-</span>
     <span class="conn-dot lost" id="connDot"></span>
-    <button class="btn-icon" onclick="openFiles()" title="Files">&#x1F4C1;</button>
-    <button class="btn-icon" onclick="openSettings()" title="Settings">&#x2699;</button>
-    <button class="btn-icon" onclick="openAPI()" title="API Docs" style="color:var(--accent)">&#x24D8;</button>
+    <button class="btn-icon" onclick="openFiles()" title="Files"><i class="fa fa-folder"></i></button>
+    <button class="btn-icon" onclick="openSettings()" title="Settings"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="window.open('docs.html')" title="API Docs" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
   </div>
 </div>
 <div class="main-area" id="channelList"></div>
@@ -205,11 +205,11 @@ function build(){
       ).join('')+'</div></div>'+
       '<div class="ch-chart-box" id="cx'+i+'"></div></div>'+
       '<div class="data-bar">'+
-      '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')">&#9998;</button></div>'+
+      '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')"><i class="fa fa-pen"></i></button></div>'+
       '<span class="timer" id="ct'+i+'">00:00</span>'+
       '<button class="btn-rec go" id="cb'+i+'" onclick="tr('+i+')">REC</button>'+
       '<span class="file-info" id="fi'+i+'"></span>'+
-      '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'">&#9660; Log</button></div>'+
+      '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'"><i class="fa fa-caret-down"></i> Log</button></div>'+
       '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>';
     l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
   }
@@ -409,7 +409,7 @@ function td(i){
   const s=document.getElementById('dts'+i);
   const show=s.style.display==='block';
   s.style.display=show?'none':'block';
-  document.getElementById('cl'+i).innerHTML=show?'&#9660; Log':'&#9650; Log';
+  document.getElementById('cl'+i).innerHTML=show?'<i class=\"fa fa-caret-down\"></i> Log':'<i class=\"fa fa-caret-up\"></i> Log';
 }
 
 function openFiles(){document.getElementById('filesOverlay').classList.add('show');loadFiles();}
@@ -422,7 +422,6 @@ function loadFiles(){
   });
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
-function openAPI(){document.getElementById('apiOverlay').classList.add('show');}
 function openSettings(){
   document.getElementById('settingsOverlay').classList.add('show');
   api('/api/settings').then(d=>{
