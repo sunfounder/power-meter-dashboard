@@ -404,8 +404,10 @@ static void handleSettings(AsyncWebServerRequest *request) {
       cfg.setRotation(r);
       if (g_lv_disp) {
         lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
+        lv_display_set_render_mode(g_lv_disp, LV_DISPLAY_RENDER_MODE_FULL);
         lv_obj_invalidate(lv_screen_active());
         lv_refr_now(NULL);
+        lv_display_set_render_mode(g_lv_disp, LV_DISPLAY_RENDER_MODE_PARTIAL);
         Serial.printf("[SET] rotation applied: %d\n", r);
       } else {
         Serial.println("[SET] g_lv_disp is NULL!");
