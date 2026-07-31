@@ -326,7 +326,7 @@ function ic(i){
       return t;
     }},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',min:0,max:600,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
+    xAxis:{type:'value',min:0,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
       {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
@@ -352,6 +352,7 @@ function poll(){
       if(r.active && recState[i]===0){
         recState[i]=1;
         sampleCount[i]=r.samples||0;
+        console.log('recover CH'+(i+1)+': samples='+r.samples+' sampleCount='+sampleCount[i]);
         document.getElementById('cr'+i).classList.add('recording');
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
