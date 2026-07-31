@@ -27,6 +27,7 @@ static lv_timer_t *_scope_timer = nullptr;
 static int _scope_ch = 2; // default CH3
 static lv_chart_series_t *_scope_ser_v = nullptr;
 static lv_chart_series_t *_scope_ser_a = nullptr;
+static lv_obj_t *_scope_val_label = nullptr;
 static lv_timer_t *_refresh_timer = nullptr;
 static lv_timer_t *_elapsed_timer = nullptr;
 static bool _dot_visible = true;
@@ -325,6 +326,12 @@ static void scope_timer_cb(lv_timer_t *) {
   lv_chart_set_next_value(_scope_chart, _scope_ser_a, s.current_mA / 1000.0f);
   static int sc=0;
   if(++sc%20==0) Serial.printf("[SCOPE] CH%d V=%.2f A=%.3f\n", _scope_ch+1, s.bus_voltage_V, s.current_mA/1000.0f);
+  if (_scope_val_label) {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "%.2fV  %.3fA  %.2fW",
+      s.bus_voltage_V, s.current_mA/1000.0f, s.power_mW/1000.0f);
+    lv_label_set_text(_scope_val_label, buf);
+  }
 }
 
 void power_meter_scope_show() {
@@ -355,6 +362,12 @@ void power_meter_scope_show() {
 
   _scope_ser_v = lv_chart_add_series(_scope_chart, lv_color_hex(0xE27005), LV_CHART_AXIS_PRIMARY_Y);
   _scope_ser_a = lv_chart_add_series(_scope_chart, lv_color_hex(0x3CB84C), LV_CHART_AXIS_SECONDARY_Y);
+
+  // Real-time values
+  _scope_val_label = lv_label_create(_scope_page);
+  lv_obj_set_style_text_color(_scope_val_label, lv_color_hex(0xE0E0E0), 0);
+  lv_obj_set_style_text_font(_scope_val_label, &lv_font_montserrat_14, 0);
+  lv_obj_align(_scope_val_label, LV_ALIGN_TOP_RIGHT, -4, 2);
 
   _scope_timer = lv_timer_create(scope_timer_cb, 10, nullptr);
 }
