@@ -46,6 +46,12 @@ public:
   void setSampleInterval(uint32_t ms) { _sample_interval_ms = ms; }
   uint32_t getSampleInterval() const { return _sample_interval_ms; }
 
+  // Fast scope mode: single channel, no temp, faster rate
+  void setFastMode(int ch);
+  void clearFastMode();
+  bool isFastMode() const { return _fast_ch >= 0; }
+  int  fastChannel() const { return _fast_ch; }
+
 private:
   MeasurementEngine();
 
@@ -62,6 +68,7 @@ private:
   uint32_t _last_sample_ms;
   uint32_t _sample_interval_ms;
   bool _sensors_ok;
+  int _fast_ch = -1;  // -1 = normal mode; 0-3 = fast scope channel
 
   void _sampleAll();
   float _readAmbientTemp();

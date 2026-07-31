@@ -19,6 +19,14 @@ static lv_obj_t *_ambient_label = nullptr;
 static lv_obj_t *_time_label = nullptr;
 static lv_obj_t *_wifi_ssid_label = nullptr;
 static lv_obj_t *_wifi_ip_label = nullptr;
+
+// Scope mode
+static lv_obj_t *_scope_page = nullptr;
+static lv_obj_t *_scope_chart = nullptr;
+static lv_timer_t *_scope_timer = nullptr;
+static int _scope_ch = 2; // default CH3
+static lv_chart_series_t *_scope_ser_v = nullptr;
+static lv_chart_series_t *_scope_ser_a = nullptr;
 static lv_timer_t *_refresh_timer = nullptr;
 static lv_timer_t *_elapsed_timer = nullptr;
 static bool _dot_visible = true;
@@ -301,7 +309,56 @@ const MeasurementSnapshot &power_meter_get_data() {
   return MeasurementEngine::getInstance().getLatest();
 }
 
-void power_meter_key_up()   {}
+void power_meter_key_up()   { power_meter_scope_next_ch(); }
 void power_meter_key_down() {}
-void power_meter_key_enter() {}
-void power_meter_key_back()  {}
+void power_meter_key_enter() {
+  if (_scope_page) power_meter_scope_hide();
+  else power_meter_scope_show();
+}
+void power_meter_key_back()  { if (_scope_page) power_meter_scope_hide(); }
+
+// ©¤©¤ Scope mode ©¤©¤
+static void scope_timer_cb(lv_timer_t *) {
+  if (!_scope_chart) return;
+  auto &s = MeasurementEngine::getInstance().getLatest().channels[_scope_ch];
+  lv_chart_set_next_value(_scope_chart, _scope_ser_v, s.bus_voltage_V);
+  lv_chart_set_next_value(_scope_chart, _scope_ser_a, s.current_mA / 1000.0f);
+}
+
+void power_meter_scope_show() {
+  if (_scope_page) return;
+  MeasurementEngine::getInstance().setFastMode(_scope_ch);
+  _scope_page = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(_scope_page, 320, 170);
+  lv_obj_set_style_bg_color(_scope_page, lv_color_hex(0x050505), 0);
+  lv_obj_set_style_border_width(_scope_page, 0, 0);
+  lv_obj_set_style_pad_all(_scope_page, 0, 0);
+
+  _scope_chart = lv_chart_create(_scope_page);
+  lv_obj_set_size(_scope_chart, 310, 150);
+  lv_obj_align(_scope_chart, LV_ALIGN_CENTER, 0, 0);
+  lv_chart_set_type(_scope_chart, LV_CHART_TYPE_LINE);
+  lv_chart_set_point_count(_scope_chart, 200);
+  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
+  lv_chart_set_range(_scope_chart, LV_CHART_AXIS_SECONDARY_Y, 0, 20);
+  lv_chart_set_div_line_count(_scope_chart, 5, 5);
+
+  _scope_ser_v = lv_chart_add_series(_scope_chart, lv_color_hex(0xE27005), LV_CHART_AXIS_PRIMARY_Y);
+  _scope_ser_a = lv_chart_add_series(_scope_chart, lv_color_hex(0x3CB84C), LV_CHART_AXIS_SECONDARY_Y);
+
+  _scope_timer = lv_timer_create(scope_timer_cb, 100, nullptr);
+}
+
+void power_meter_scope_hide() {
+  MeasurementEngine::getInstance().clearFastMode();
+  if (_scope_timer) { lv_timer_del(_scope_timer); _scope_timer = nullptr; }
+  if (_scope_page) { lv_obj_del(_scope_page); _scope_page = nullptr; _scope_chart = nullptr; }
+}
+
+void power_meter_scope_next_ch() {
+  _scope_ch = (_scope_ch + 1) % 4;
+  if (_scope_page) {
+    power_meter_scope_hide();
+    power_meter_scope_show();
+  }
+}

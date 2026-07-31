@@ -24,3 +24,8 @@ void power_meter_key_up();
 void power_meter_key_down();
 void power_meter_key_enter();
 void power_meter_key_back();
+
+// Scope mode
+void power_meter_scope_show();
+void power_meter_scope_hide();
+void power_meter_scope_next_ch();

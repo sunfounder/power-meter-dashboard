@@ -75,7 +75,20 @@ void MeasurementEngine::update() {
   uint32_t now = millis();
   auto &recorder = DataRecorder::getInstance();
 
-  // No hotplug ¡ª only check at boot in begin()
+  // Fast scope mode: single channel, 100ms, no temp, no record
+  if (_fast_ch >= 0) {
+    if (now - _last_sample_ms >= 100) {
+      _last_sample_ms = now;
+      auto m = _ina226[_fast_ch].readAll();
+      _snapshot.timestamp_ms = time(nullptr);
+      _snapshot.channels[_fast_ch].bus_voltage_V = m.bus_voltage_V;
+      _snapshot.channels[_fast_ch].current_mA    = m.current_mA;
+      _snapshot.channels[_fast_ch].power_mW      = m.power_mW;
+      _snapshot.channels[_fast_ch].connected     = true;
+    }
+    return;
+  }
+
   if (recorder.isAnyRecording()) {
     if (now - _last_sample_ms >= _sample_interval_ms) {
       _last_sample_ms = now;
@@ -85,12 +98,21 @@ void MeasurementEngine::update() {
       checkAutoStop();
     }
   } else {
-    // Even when not recording, sample at ~1Hz for display
     if (now - _last_sample_ms >= 1000) {
       _last_sample_ms = now;
       _sampleAll();
     }
   }
+}
+
+void MeasurementEngine::setFastMode(int ch) {
+  if (ch < 0 || ch > 3) return;
+  _fast_ch = ch;
+  _last_sample_ms = 0;
+}
+void MeasurementEngine::clearFastMode() {
+  _fast_ch = -1;
+  _last_sample_ms = 0;
 }
 
 void MeasurementEngine::_sampleAll() {
