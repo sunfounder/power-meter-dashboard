@@ -92,42 +92,42 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 <body>
 <div class="conn-overlay" id="connOverlay">
   <div class="conn-box">
-    <h2>Connect to Device</h2>
-    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">Enter the IP address</p>
+    <h2>连接设备</h2>
+    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">输入设备 IP 地址</p>
     <input id="connIP" placeholder="192.168.4.1" onkeydown="if(event.key==='Enter')doConnect()" autofocus>
     <div class="conn-err" id="connErr"></div>
-    <button class="conn-btn" onclick="doConnect()">Connect</button>
+    <button class="conn-btn" onclick="doConnect()">连接</button>
   </div>
 </div>
 <div class="header">
-  <span class="title">4CH Power Meter</span>
+  <span class="title">SunFounder 功率计</span>
   <div class="right">
-    <span class="ambient" id="ambTemp">Amb: --.-</span>
+    <span class="ambient" id="ambTemp">--.-</span>
     <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
     <span class="conn-dot lost" id="connDot"></span>
-    <button class="btn-icon" onclick="openFiles()" title="Files"><i class="fa fa-folder"></i></button>
-    <button class="btn-icon" onclick="openSettings()" title="Settings"><i class="fa fa-gear"></i></button>
-    <button class="btn-icon" onclick="window.open('docs.html')" title="API Docs" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
+    <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
+    <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
   </div>
 </div>
 <div class="main-area" id="channelList"></div>
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">Settings</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
-    <div class="section"><label>Device IP</label><div class="row"><input type="text" id="setIP"><button class="btn-buzz" onclick="reconnect()">Reconnect</button></div></div>
-    <div class="section"><label>Device Name</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
-    <div class="section"><label>AP Password</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">Save</button></div></div>
-    <div class="section"><label>Timezone</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
-    <div class="section"><label>Chart X min (min)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
-    <div class="section"><label>Display Rotation</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'rot0','rot180');saveSet('rotation','0')" id="rot0">0°</button><button class="toggle-btn" onclick="toggle2(this,'rot180','rot0');saveSet('rotation','180')" id="rot180">180°</button></div></div>
-    <div class="section"><label>Temperature Unit</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
-    <div class="section"><label>WiFi STA</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">Connect</button></div></div>
-    <div class="section"><button class="btn-restart" onclick="if(confirm('Restart?'))api('/api/restart',{method:'POST'})">Restart</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">设置</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
+    <div class="section"><label>设备 IP</label><div class="row"><input type="text" id="setIP"><button class="btn-buzz" onclick="reconnect()">重连</button></div></div>
+    <div class="section"><label>设备名称</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
+    <div class="section"><label>AP 密码</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">保存</button></div></div>
+    <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
+    <div class="section"><label>图表 X 轴 (分钟)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
+    <div class="section"><label>屏幕旋转</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'rot0','rot180');saveSet('rotation','0')" id="rot0">0°</button><button class="toggle-btn" onclick="toggle2(this,'rot180','rot0');saveSet('rotation','180')" id="rot180">180°</button></div></div>
+    <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
+    <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">Files</h2><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div>
     <div id="fileList" style="max-height:300px;overflow-y:auto">Loading...</div>
   </div>
 </div>
@@ -420,7 +420,7 @@ function delRecFile(i){
   if(!recFiles[i])return;
   if(!confirm('Delete '+recFiles[i]+'?'))return;
   api('/api/delete?file='+encodeURIComponent(recFiles[i]),{method:'POST'}).then(r=>{
-    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('Deleted');}
+    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('已删除');}
     else toast('Delete failed');
   });
 }
@@ -436,8 +436,8 @@ function openFiles(){document.getElementById('filesOverlay').classList.add('show
 function loadFiles(){
   api('/api/files').then(d=>{
     const el=document.getElementById('fileList');
-    if(!d||!d.length){el.innerHTML='<span style="color:#555">No files ('+MAX_FILES+' max)</span>';return;}
-    el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' files</span>'+
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';return;}
+    el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>'+
       d.map(f=>'<div class="file-row"><span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span><a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'">DL</a><button class="btn-del" onclick="if(confirm(\'Delete?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();else toast(\'Del fail\')})}">X</button></div>').join('');
   });
 }
@@ -476,7 +476,7 @@ function toast(msg){
 async function downloadCSV(i){
   if(!recFiles[i])return;
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(recFiles[i]));
-  if(!resp.ok){toast('Download failed');return;}
+  if(!resp.ok){toast('下载失败');return;}
   const buf=await resp.arrayBuffer();
   const v=new DataView(buf);
   let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
@@ -496,7 +496,7 @@ async function downloadCSV(i){
   a.download=recFiles[i].replace('.dat','.csv');
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('CSV downloaded');
+  toast('CSV 已下载');
 }
 
 // ── Pull buffered data to fill chart after page refresh ──
