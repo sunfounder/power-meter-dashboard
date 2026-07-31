@@ -97,6 +97,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <span class="title">4CH Power Meter</span>
   <div class="right">
     <span class="ambient" id="ambTemp">Amb: --.-</span>
+    <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="Files"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="Settings"><i class="fa fa-gear"></i></button>
@@ -265,7 +266,10 @@ function poll(){
         const btn=document.getElementById('cb'+i);
         btn.textContent='STOP';btn.className='btn-rec stop';
         document.getElementById('rn'+i).textContent=r.name||pfx[i];
-        loadBufferData(i);  // fill chart with buffered data
+        // Wait for chart to be ready, then load buffer data
+        const chIdx=i;
+        const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+        setTimeout(tryLoad,500);
       }
     }
     up();uc();updateTables();
@@ -288,6 +292,11 @@ function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
   document.getElementById('ambTemp').textContent='Amb: '+(d.ambient_temp_C!=null?d.ambient_temp_C.toFixed(1)+' C':'--.-');
+  if(d.timestamp){
+    const dt=new Date(d.timestamp*1000);
+    document.getElementById('pageTime').textContent=
+      ('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)+':'+('0'+dt.getSeconds()).slice(-2);
+  }
 
   for(let i=0;i<4;i++){
     const ch=chs[i];if(!ch)continue;const ok=ch.connected;
