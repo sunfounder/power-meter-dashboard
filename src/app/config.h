@@ -66,6 +66,10 @@ public:
   uint16_t rotation() const { return _rotation; }
   void setRotation(uint16_t r);
 
+  // Ambient temp calibration offset
+  float ambTempOffset() const { return _amb_temp_offset; }
+  void setAmbTempOffset(float v) { _amb_temp_offset = v; }
+
   // Auto-stop conditions (per channel)
   const StopCond &stopCond(int ch) const { return _stop[ch]; }
   void setStopCond(int ch, bool enabled, float v_thresh, float mA_thresh, uint16_t max_min, bool falling);
@@ -85,7 +89,8 @@ private:
   uint32_t _sample_interval_ms;
   char _temp_unit;  // 'C' or 'F'
   int8_t _tz_offset;
-  uint16_t _rotation;  // 0, 90, 180, 270
+  uint16_t _rotation;
+  float _amb_temp_offset;  // 0, 90, 180, 270
 
   StopCond _stop[4];
 };

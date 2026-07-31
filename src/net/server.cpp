@@ -411,6 +411,10 @@ static void handleSettings(AsyncWebServerRequest *request) {
       cfg.setTempUnit(unit.charAt(0));
       updated = true;
     }
+    if (request->hasParam("amb_temp_offset", true)) {
+      cfg.setAmbTempOffset(request->getParam("amb_temp_offset", true)->value().toFloat());
+      updated = true;
+    }
     if (request->hasParam("stop_ch", true)) {
       int ch = request->getParam("stop_ch", true)->value().toInt();
       cfg.setStopCond(ch,
@@ -462,6 +466,7 @@ static void handleSettings(AsyncWebServerRequest *request) {
   doc["tz_offset"] = cfg.tzOffset();
   doc["rotation"] = cfg.rotation();
   doc["version"] = FIRMWARE_VERSION;
+  doc["amb_temp_offset"] = cfg.ambTempOffset();
 
   // Stop conditions per channel
   JsonArray sc_arr = doc["stop_cond"].to<JsonArray>();

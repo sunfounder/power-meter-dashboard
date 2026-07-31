@@ -129,7 +129,7 @@ float MeasurementEngine::_readAmbientTemp() {
   float temp = _ntc.voltageToTemp(voltage);
   static int acnt=0;
   if(++acnt%10==0) Serial.printf("[AMB] ADC=%.0f V=%.3f temp=%.1f\n", raw_avg, voltage, temp);
-  return temp + AMB_NTC_CALIB_OFFSET;
+  return temp + DeviceSettings::getInstance().ambTempOffset();
 }
 
 bool MeasurementEngine::isINA226Connected(int ch) const {

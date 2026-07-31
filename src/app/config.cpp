@@ -74,6 +74,7 @@ void DeviceSettings::load() {
   _temp_unit = prefs.getChar("temp_unit", 'C');
   _tz_offset = prefs.getChar("tz_offset", 8);
   _rotation  = prefs.getUShort("rotation", 0);
+  _amb_temp_offset = prefs.getFloat("amb_toff", 0);
 
   // Load stop conditions per channel
   for (int i = 0; i < 4; i++) {
@@ -125,6 +126,7 @@ void DeviceSettings::save() {
   prefs.putChar("temp_unit", _temp_unit);
   prefs.putChar("tz_offset", _tz_offset);
   prefs.putUShort("rotation", _rotation);
+  prefs.putFloat("amb_toff", _amb_temp_offset);
 
   // Save stop conditions per channel
   for (int i = 0; i < 4; i++) {

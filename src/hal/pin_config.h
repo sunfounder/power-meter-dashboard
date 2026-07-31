@@ -73,4 +73,4 @@
 #define NTC_B_VALUE            3950
 
 /* Ambient NTC calibration offset (°C) */
-#define AMB_NTC_CALIB_OFFSET   -5.5f
+#define AMB_NTC_CALIB_OFFSET   0.0f
