@@ -228,23 +228,23 @@ function saveRecName(i){
 
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
-  const X60=Array.from({length:61},(_,k)=>(k<10?'0':'')+k+':00'); // 0-60 min
-  const N=10; // initial visible minutes
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
   c.setOption({
-    grid:{left:45,right:50,top:8,bottom:20},
+    grid:{left:55,right:50,top:8,bottom:20},
     tooltip:{trigger:'axis',confine:true},
-    xAxis:{type:'category',show:true,data:X60.slice(0,N+1),axisLabel:{color:'#555',fontSize:8,interval:2},max:N},
+    xAxis:{type:'time',min:Date.now()-600000,max:Date.now(),axisLabel:{color:'#555',fontSize:8,formatter:v=>{
+      const d=new Date(v);return ('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);
+    }}},
     yAxis:[
       {type:'value',name:'V',position:'left',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{color:C[0],fontSize:9},min:0},
       {type:'value',name:'A/W',position:'right',offset:0,splitLine:{show:false},axisLabel:{color:C[1],fontSize:9},min:0},
       {type:'value',name:'C',position:'right',offset:40,splitLine:{show:false},axisLabel:{color:C[3],fontSize:9},min:0}
     ],
     series:[
-      {name:'V',type:'line',yAxisIndex:0,data:Array(61).fill(null),lineStyle:{color:C[0],width:1.5},symbol:'none'},
-      {name:'A',type:'line',yAxisIndex:1,data:Array(61).fill(null),lineStyle:{color:C[1],width:1.5},symbol:'none'},
-      {name:'W',type:'line',yAxisIndex:1,data:Array(61).fill(null),lineStyle:{color:C[2],width:1.5},symbol:'none'},
-      {name:'C',type:'line',yAxisIndex:2,data:Array(61).fill(null),lineStyle:{color:C[3],width:1.5},symbol:'none'}
+      {name:'V',type:'line',yAxisIndex:0,data:[],lineStyle:{color:C[0],width:1.5},symbol:'none'},
+      {name:'A',type:'line',yAxisIndex:1,data:[],lineStyle:{color:C[1],width:1.5},symbol:'none'},
+      {name:'W',type:'line',yAxisIndex:1,data:[],lineStyle:{color:C[2],width:1.5},symbol:'none'},
+      {name:'C',type:'line',yAxisIndex:2,data:[],lineStyle:{color:C[3],width:1.5},symbol:'none'}
     ],animation:false});
 }
 
@@ -315,6 +315,7 @@ function up(){
 
 function uc(){
   if(!lastData)return;
+  const ts=(lastData.timestamp||Date.now()/1000)*1000; // ms
   for(let i=0;i<4;i++){
     const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
     const c=charts[i];if(!c)continue;
@@ -326,19 +327,15 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
-    // Map elapsed mins to position; expand X axis if needed
-    const elapsed=lastData.recording[i]?.elapsed||'00:00';
-    const mm=parseInt(elapsed.split(':')[0])||0;
-    const pos=Math.min(mm,60);
-    const curMax=c.getOption().xAxis[0].max||10;
-    if(mm>curMax){
-      const X60=Array.from({length:61},(_,k)=>(k<10?'0':'')+k+':00');
-      c.setOption({xAxis:{data:X60.slice(0,mm+1),max:mm}},{notMerge:false});
-    }
-    const opts={series:[]};
+    // Auto-scroll X axis: keep last 10 min visible
+    const now=Date.now();
+    const xMin=now-600000;
+    const opts={xAxis:{min:xMin,max:now},series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data[pos]=pts[m];
+      data.push([ts,pts[m]]);
+      // trim data older than 30 min
+      while(data.length>1&&data[0][0]<now-1800000)data.shift();
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
@@ -359,7 +356,7 @@ function tr(i){
     document.getElementById('fi'+i).innerHTML='';
     // Clear chart
     if(charts[i]){
-      charts[i].setOption({series:[{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)}]});
+      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
       lastNZ[i]=[0,0,0,0];
     }
     document.getElementById('rn'+i).textContent=pfx[i];
@@ -396,7 +393,7 @@ function tr(i){
     recFiles[i]='';
     // Clear chart
     if(charts[i]){
-      charts[i].setOption({series:[{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)},{data:Array(61).fill(null)}]});
+      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
     }
   }
 }
@@ -481,12 +478,8 @@ async function loadBufferData(i){
   const c=charts[i];if(!c)return;
   const opts={series:[]};
   for(let m=0;m<4;m++){
-    const data=[...c.getOption().series[m].data];
     const key=['V','A','W','C'][m];
-    d.forEach((p,j)=>{
-      const pos=Math.min(j,60);
-      data[pos]=parseFloat(p[key])||0;
-    });
+    const data=d.map(p=>[p.t*1000,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
