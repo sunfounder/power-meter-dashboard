@@ -126,9 +126,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </div>
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
+    <div id="storageBar" style="margin-bottom:8px"></div>
     <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
-    <div id="storageBar" style="font-size:10px;color:var(--dim);margin-top:6px"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -399,8 +399,8 @@ function tr(i){
           recFiles[i]=latest.name||'';
           const fi=document.getElementById('fi'+i);
           fi.innerHTML=' | '+recFiles[i]+
-            ' <a href="#" onclick="downloadCSV('+i+');return false" style="color:var(--accent);font-size:10px;text-decoration:none">Download</a>'+
-            ' <button onclick="delRecFile('+i+')" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:10px">Delete</button>';
+            ' <a href="#" onclick="downloadCSV('+i+');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
       });
     });
@@ -439,17 +439,42 @@ function td(i){
 }
 
 function openFiles(){document.getElementById('filesOverlay').classList.add('show');loadFiles();}
+let selectedFiles=[];
+
 function loadFiles(){
   api('/api/files').then(d=>{
     const el=document.getElementById('fileList');
     if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
-    else{el.innerHTML='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>'+
-      d.map(f=>'<div class="file-row"><span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span><a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'">DL</a><button class="btn-del" onclick="if(confirm(\'确认删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();else toast(\'删除失败\')})}">X</button></div>').join('');}
+    else{
+      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>';
+      d.forEach(f=>{
+        html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
+          '<span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
+          '<a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'" title="下载"><i class="fa fa-download"></i></a>'+
+          '<button class="btn-del" onclick="if(confirm(\'删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="删除"><i class="fa fa-trash"></i></button></div>';
+      });
+      el.innerHTML=html;
+    }
   });
   api('/api/storage').then(s=>{
     if(!s)return;
-    document.getElementById('storageBar').innerHTML='存储: '+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 可用)';
+    const pct=Math.round(s.used_kb/s.total_kb*100);
+    document.getElementById('storageBar').innerHTML=
+      '<div style="font-size:10px;color:var(--dim);margin-bottom:2px">'+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 可用)</div>'+
+      '<div style="height:4px;background:#1a1a1a;border-radius:2px"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:2px"></div></div>';
   });
+}
+function onFileCheck(){
+  const cbs=document.querySelectorAll('.file-cb:checked');
+  document.getElementById('btnDelSel').style.display=cbs.length?'inline-block':'none';
+}
+function delSelected(){
+  const cbs=document.querySelectorAll('.file-cb:checked');
+  if(!cbs.length)return;
+  if(!confirm('删除 '+cbs.length+' 个文件?'))return;
+  Promise.all(Array.from(cbs).map(cb=>
+    api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
+  )).then(()=>loadFiles());
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openSettings(){
