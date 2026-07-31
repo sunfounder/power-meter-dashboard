@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>4CH Power Meter — API Docs</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0c0c0c;color:#ddd;max-width:800px;margin:20px auto;padding:0 16px}
+h1{color:#e27005;font-size:20px}
+h2{color:#e27005;font-size:15px;margin-top:24px;border-bottom:1px solid #2a2a2a;padding-bottom:4px}
+code{background:#1a1a1a;padding:2px 6px;border-radius:3px;font-size:13px;color:#e27005}
+pre{background:#111;border:1px solid #2a2a2a;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+td,th{padding:6px 8px;border:1px solid #2a2a2a;text-align:left}
+th{background:#1a1a1a;color:#e27005}
+a{color:#e27005}
+</style>
+</head>
+<body>
+<h1>4CH Power Meter — REST API</h1>
+<p>Base URL: <code>http://&lt;device-ip&gt;</code> (AP: 192.168.4.1, STA: assigned by router)</p>
+
+<h2>Health</h2>
+<table><tr><th>Method</th><th>Path</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/ping</code></td><td><code>"pong"</code></td></tr></table>
+
+<h2>Status</h2>
+<table><tr><th>Method</th><th>Path</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/status</code></td><td>JSON: channels[4], env, recording[4], timestamp</td></tr></table>
+<pre>{
+  "timestamp": 1712345678,
+  "channels": [{
+    "bus_voltage_V": 5.003,
+    "current_mA": 12.5,
+    "power_mW": 62.5,
+    "channel_temp_C": 25.3,
+    "connected": true,
+    "name": "CH1"
+  }, ...],
+  "env": {"ambient_temp_C": 28.1},
+  "recording": [{"active":true,"elapsed":"00:05","samples":5,"name":"test"}, ...]
+}</pre>
+
+<h2>Recording</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Note</th></tr>
+<tr><td>POST</td><td><code>/api/channel/{0-3}/record/start</code></td><td><code>name=test</code></td><td>Start recording</td></tr>
+<tr><td>POST</td><td><code>/api/channel/{0-3}/record/stop</code></td><td>—</td><td>Stop + flush to .dat</td></tr>
+<tr><td>GET</td><td><code>/api/channel/{0-3}/record/data</code></td><td>—</td><td>Buffered samples as JSON</td></tr>
+</table>
+
+<h2>Files</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Note</th></tr>
+<tr><td>GET</td><td><code>/api/files</code></td><td>—</td><td>List .dat files</td></tr>
+<tr><td>GET</td><td><code>/api/download?file=xxx.dat</code></td><td>—</td><td>Raw binary (24B/sample)</td></tr>
+<tr><td>POST</td><td><code>/api/delete?file=xxx.dat</code></td><td>—</td><td>Delete file</td></tr>
+</table>
+
+<h2>.dat Binary Format</h2>
+<p>Each sample = 24 bytes (little-endian):</p>
+<pre>struct SampleBin {
+  uint32_t timestamp;     // UNIX seconds
+  float bus_voltage_V;
+  float current_A;
+  float power_W;
+  float channel_temp_C;
+  float ambient_temp_C;
+};
+// JS: DataView → getUint32(off,true), getFloat32(off+4,true), ...</pre>
+
+<h2>Settings</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body params</th></tr>
+<tr><td>GET</td><td><code>/api/settings</code></td><td>—</td></tr>
+<tr><td>POST</td><td><code>/api/settings</code></td><td>device_name, ap_password, wifi_ssid, wifi_password, sample_interval_ms, temp_unit, tz_offset, rotation</td></tr>
+</table>
+
+<h2>WiFi</h2>
+<table><tr><th>Method</th><th>Path</th><th>Body</th></tr>
+<tr><td>POST</td><td><code>/api/wifi</code></td><td><code>ssid=X&password=Y</code></td></tr></table>
+
+<h2>Other</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Note</th></tr>
+<tr><td>POST</td><td><code>/api/restart</code></td><td>Reboot device</td></tr>
+<tr><td>POST</td><td><code>/api/buzzer/test</code></td><td>Beep test</td></tr>
+<tr><td>GET</td><td><code>/api/logs</code></td><td>Device log</td></tr>
+</table>
+</body>
+</html>
