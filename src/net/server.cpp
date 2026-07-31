@@ -399,11 +399,14 @@ static void handleSettings(AsyncWebServerRequest *request) {
     }
     if (request->hasParam("rotation", true)) {
       uint16_t r = request->getParam("rotation", true)->value().toInt();
+      Serial.printf("[SET] rotation=%d\n", r);
       cfg.setRotation(r);
-      // Apply rotation live
       if (g_lv_disp) {
         lv_display_set_rotation(g_lv_disp, (lv_display_rotation_t)(r / 90));
         lv_refr_now(NULL);
+        Serial.printf("[SET] rotation applied: %d\n", r);
+      } else {
+        Serial.println("[SET] g_lv_disp is NULL!");
       }
       updated = true;
     }

@@ -117,6 +117,9 @@ static void refresh_card(int ch) {
   auto &s = MeasurementEngine::getInstance().getLatest().channels[ch];
   char buf[24];
 
+  // Always update temperature unit label
+  lv_label_set_text(_unit_labels[ch][3], DeviceSettings::getInstance().tempUnit()=='F' ? "F" : "C");
+
   if (!s.connected) {
     lv_label_set_text(_val_labels[ch][0], "---");
     lv_label_set_text(_val_labels[ch][1], "---");
