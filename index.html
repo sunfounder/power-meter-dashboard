@@ -161,6 +161,7 @@ let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],p
 let recState=[0,0,0,0]; // 0=idle, 1=recording, 2=stopped
 let recFiles=['','','',''];
 let recStart=[0,0,0,0];
+let tempUnit='C';
 const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
 const MAX_FILES=10;
 
@@ -263,6 +264,7 @@ function poll(){
   api('/api/status').then(d=>{
     if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
     lastData=d;document.getElementById('connDot').className='conn-dot';
+    if(d.temp_unit)tempUnit=d.temp_unit;
 
     // Recover recording state after page refresh
     if(d.recording)for(let i=0;i<4;i++){
@@ -299,7 +301,7 @@ function updateTables(){
 function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
-  document.getElementById('ambTemp').textContent='Amb: '+(d.ambient_temp_C!=null?d.ambient_temp_C.toFixed(1)+' C':'--.-');
+  document.getElementById('ambTemp').textContent='Amb: '+convTemp(d.ambient_temp_C||0).toFixed(1)+' '+ut();
   if(d.timestamp){
     const dt=new Date(d.timestamp*1000);
     document.getElementById('pageTime').textContent=
@@ -312,6 +314,7 @@ function up(){
       const el=document.getElementById('cv'+i+'_'+j);if(!el)continue;
       if(!ok){el.textContent='---';el.className='m-value dim';continue;}
       let raw=ch[MKEYS[j]];if(raw==null||isNaN(raw))raw=0;
+      if(j===3)raw=convTemp(raw); // channel temp
       el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?(raw/1000).toFixed(3):raw.toFixed(1));
       el.className='m-value';
     }
@@ -458,6 +461,8 @@ function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParam
 function saveXMin(v){localStorage.setItem('pm_xmin',v);}
 function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
 function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
+function convTemp(c){return tempUnit==='F'?c*9/5+32:c;}
+function ut(){return tempUnit==='F'?'F':'C';}
 function saveWiFi(){
   const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
   api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
