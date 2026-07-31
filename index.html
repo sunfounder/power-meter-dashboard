@@ -118,7 +118,6 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>设备名称</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
     <div class="section"><label>AP 密码</label><div class="row"><input type="text" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)" style="margin-left:auto">保存</button></div></div>
     <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
-    <div class="section"><label>图表 X 轴 (分钟)</label><input type="number" id="setXMin" value="10" min="1" max="60" onchange="saveXMin(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"></div>
     <div class="section"><label>屏幕旋转</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'rot0','rot180');saveSet('rotation','0')" id="rot0">0°</button><button class="toggle-btn" onclick="toggle2(this,'rot180','rot0');saveSet('rotation','180')" id="rot180">180°</button></div></div>
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><input type="password" id="setWifiPass" placeholder="Password"><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
@@ -246,7 +245,7 @@ function ic(i){
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',min:0,max:getXMin()*60,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
+    xAxis:{type:'value',min:0,max:600,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
       {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
@@ -264,7 +263,7 @@ function poll(){
   api('/api/status').then(d=>{
     if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
     lastData=d;document.getElementById('connDot').className='conn-dot';
-    if(d.temp_unit)tempUnit=d.temp_unit;
+    if(d.temp_unit){tempUnit=d.temp_unit;console.log('tempUnit:',tempUnit);}
 
     // Recover recording state after page refresh
     if(d.recording)for(let i=0;i<4;i++){
@@ -338,10 +337,12 @@ function up(){
 
 function uc(){
   if(!lastData)return;
+  const ts=lastData.timestamp||Math.floor(Date.now()/1000); // UNIX seconds
   for(let i=0;i<4;i++){
     const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
     const c=charts[i];if(!c)continue;
     if(recState[i]!==1)continue;
+    if(!recStart[i])recStart[i]=ts*1000;
     const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
     const pts=[];
     for(let m=0;m<4;m++){
@@ -349,11 +350,11 @@ function uc(){
       if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
       pts.push(v||0);
     }
-    const elapsed=(Date.now()-recStart[i])/1000; // seconds since start
+    const elapsedSec=ts-recStart[i]/1000;
     const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([elapsed,pts[m]]);
+      data.push([elapsedSec,pts[m]]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
