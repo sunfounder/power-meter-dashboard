@@ -6,15 +6,19 @@ INA226::INA226(uint8_t addr, float shunt_mohm)
 
 bool INA226::begin(TwoWire &wire) {
   _wire = &wire;
-  uint16_t mfrId = readManufacturerID();
-  if (mfrId != 0x5449) {
-    Serial.printf("[INA] 0x%02X: bad MFR ID 0x%04X, skipping\n", _addr, mfrId);
-    return false;
+  // Retry MFR ID read ¡ª multi-chip I2C bus may need settling
+  for (int retry = 0; retry < 5; retry++) {
+    uint16_t mfrId = readManufacturerID();
+    if (mfrId == 0x5449) {
+      configureDefault();
+      calibrate();
+      WebLog::getInstance().log("INA 0x%02X: OK (shunt=%.0fmohm)", _addr, _shunt_mohm);
+      return true;
+    }
+    if (retry < 4) { delay(10); }
   }
-  configureDefault();
-  calibrate();
-  WebLog::getInstance().log("INA 0x%02X: OK (shunt=%.0fmohm)", _addr, _shunt_mohm);
-  return true;
+  Serial.printf("[INA] 0x%02X: bad MFR ID, skipping after 5 retries\n", _addr);
+  return false;
 }
 
 bool INA226::isConnected() {
