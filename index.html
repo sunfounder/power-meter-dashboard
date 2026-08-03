@@ -129,7 +129,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
-    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button></div>
+    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button>
+    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
     <div style="text-align:center;font-size:10px;color:var(--dim);margin-top:8px" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:10px;color:#444">Dashboard v1.1</div>
   </div>
@@ -603,6 +604,9 @@ function saveWiFi(){
 function toast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
+}
+function saveLog(){
+  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保存');else toast('取消')});
 }
 function checkUpdate(){
   if(!navigator.serviceWorker||!navigator.serviceWorker.controller){toast('离线模式不支持更新');return;}
