@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-let mainWindow, logFile = '';
+let mainWindow, logBuf = [];
 
 app.commandLine.appendSwitch('disable-web-security');
 
@@ -25,18 +25,10 @@ function createWindow() {
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
 
-// Logging
-function getLogPath() {
-  if (!logFile) {
-    const d = new Date();
-    const ts = `${d.getFullYear()}${('0'+(d.getMonth()+1)).slice(-2)}${('0'+d.getDate()).slice(-2)}_${('0'+d.getHours()).slice(-2)}${('0'+d.getMinutes()).slice(-2)}`;
-    logFile = path.join(app.getPath('desktop'), `power-meter_${ts}.log`);
-  }
-  return logFile;
-}
+// Logging — buffered in memory, only written to file on export
 function log(msg) {
-  const line = `${new Date().toISOString()} ${msg}\n`;
-  fs.appendFileSync(getLogPath(), line);
+  logBuf.push(`${new Date().toISOString()} ${msg}`);
+  if (logBuf.length > 2000) logBuf.shift();
   console.log(msg);
 }
 
@@ -49,11 +41,18 @@ ipcMain.on('close', () => mainWindow.close());
 ipcMain.on('log', (e, msg) => log('[WEB] ' + msg));
 ipcMain.on('api-log', (e, data) => log('[API] ' + JSON.stringify(data)));
 
-// IPC: save log
+// IPC: save log to chosen path (buffered only, no auto-write)
 ipcMain.handle('save-log', async () => {
-  const p = getLogPath();
-  const r = await dialog.showSaveDialog({ defaultPath: p, filters: [{ name: 'Log', extensions: ['log'] }] });
-  if (!r.canceled) fs.copyFileSync(p, r.filePath);
-  return r.canceled ? null : r.filePath;
+  const d = new Date();
+  const ts = `${d.getFullYear()}${('0'+(d.getMonth()+1)).slice(-2)}${('0'+d.getDate()).slice(-2)}_${('0'+d.getHours()).slice(-2)}${('0'+d.getMinutes()).slice(-2)}${('0'+d.getSeconds()).slice(-2)}`;
+  const r = await dialog.showSaveDialog({
+    defaultPath: path.join(app.getPath('desktop'), `power-meter_${ts}.log`),
+    filters: [{ name: 'Log', extensions: ['log'] }]
+  });
+  if (!r.canceled) {
+    fs.writeFileSync(r.filePath, logBuf.join('\n') + '\n');
+    return r.filePath;
+  }
+  return null;
 });
-ipcMain.handle('get-log-path', () => getLogPath());
+ipcMain.handle('get-log-path', () => '');
