@@ -10,9 +10,10 @@
 <style>
 :root{--bg:#080808;--card-bg:#141414;--border:#2a2a2a;--accent:#e27005;--text:#e0e0e0;--dim:#777;--red:#e04040;--green:#3cb84c}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;display:flex;flex-direction:column}
 body.locked .main-area{opacity:0.3;pointer-events:none}
-.header{background:#0c0c0c;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.header{background:#0c0c0c;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);width:100%;flex-shrink:0}
 .header .title{font-size:16px;color:var(--accent);font-weight:700}
 .header .right{display:flex;align-items:center;gap:10px}
 .ambient{font-size:12px;color:var(--dim)}
@@ -20,11 +21,11 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 .conn-dot.lost{background:var(--red)}
 .btn-icon{background:none;border:1px solid var(--border);color:var(--text);font-size:14px;padding:3px 8px;border-radius:4px;cursor:pointer}
 .btn-icon:hover{background:#222}
-.main-area{max-width:none;margin:0 auto;padding:4px 8px;overflow:hidden}
-.ch-row{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;padding:8px}
+.main-area{flex:1;padding:4px 8px;overflow:hidden;display:flex;flex-direction:column;gap:2px;width:100%}
+.ch-row{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:4px}
 .ch-row.recording{border-color:var(--red)}
 .ch-row.stopped{border-color:var(--accent)}
-.ch-main{display:flex;gap:8px;align-items:stretch}
+.ch-main{display:flex;gap:8px;align-items:stretch;flex:1;min-height:0}
 .ch-metrics-box{display:flex;flex-direction:column;gap:4px;background:#111;border:1px solid #222;border-radius:8px;padding:6px 8px;min-width:100px;flex:0 0 110px}
 .ch-top{display:flex;align-items:center;gap:6px}
 .ch-name{font-size:14px;font-weight:700;color:var(--accent)}
@@ -644,13 +645,13 @@ async function downloadCSVFile(fname){
   toast('下载中...');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
   if(!resp.ok){toast('下载失败');return;}
-  toast('转换中...');
   const buf=await resp.arrayBuffer();
   const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
   for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
+  toast('转换完成，请选择保存位置');
   const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
-  URL.revokeObjectURL(a.href);toast('CSV 已下载');
+  URL.revokeObjectURL(a.href);
 }
 async function downloadCSV(i){
   if(!recFiles[i])return;
