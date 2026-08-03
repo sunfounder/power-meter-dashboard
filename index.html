@@ -218,6 +218,8 @@ function setDevice(ip){
   build();
   if(pollTimer)clearInterval(pollTimer);
   poll();pollTimer=setInterval(poll,1000);
+  // Fetch firmware version once
+  api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
