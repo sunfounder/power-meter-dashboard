@@ -624,29 +624,16 @@ function saveLog(){
   if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保存');else toast('取消')});
 }
 function checkUpdate(){
-  if(window.electron){
-    // Electron: fetch remote index.html and compare with cached
-    toast('正在检查更新...');
-    fetch('https://sunfounder.github.io/power-meter-dashboard/index.html?t='+Date.now())
-    .then(r=>r.text()).then(remote=>{
-      caches.open('power-meter-v1').then(c=>c.match('index.html').then(r=>{
-        if(!r)return toast('无缓存');
-        r.text().then(local=>{
-          if(remote!==local){if(confirm('发现新版本，更新?')){caches.delete('power-meter-v1').then(()=>location.reload(true));}}
-          else toast('已是最新');
-        });
-      }));
-    }).catch(()=>toast('检查失败'));
-    return;
-  }
-  // Browser with SW
-  if(!navigator.serviceWorker||!navigator.serviceWorker.controller){toast('离线模式不支持更新');return;}
   toast('正在检查更新...');
-  fetch('index.html?t='+Date.now()).then(r=>r.text()).then(txt=>{
-    caches.open('power-meter-v1').then(c=>c.match('index.html').then(r=>r.text().then(old=>{
-      if(txt!==old){if(confirm('发现新版本，更新?')){caches.delete('power-meter-v1').then(()=>location.reload(true));}}
-      else toast('已是最新');
-    })));
+  fetch('https://sunfounder.github.io/power-meter-dashboard/version.json?t='+Date.now())
+  .then(r=>r.json()).then(remote=>{
+    const localVer='1.1.0';
+    if(remote.version!==localVer){
+      if(confirm('发现新版本 v'+remote.version+'\n\n'+remote.changelog+'\n\n是否更新?')){
+        if(window.electron){location.reload(true);}
+        else{caches.delete('power-meter-v1').then(()=>location.reload(true));}
+      }
+    }else toast('已是最新 v'+localVer);
   }).catch(()=>toast('检查失败'));
 }
 if('serviceWorker' in navigator){
