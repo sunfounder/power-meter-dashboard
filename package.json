@@ -9,13 +9,24 @@
   },
   "build": {
     "appId": "com.sunfounder.powermeter",
-    "productName": "SunFounder 功率计",
+    "productName": "SunFounder功率计",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "dashboard/index.html",
+      "dashboard/docs.html",
+      "dashboard/manifest.json",
+      "dashboard/sw.js",
+      "dashboard/version.json"
+    ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "signAndEditExecutable": false
     }
   },
   "devDependencies": {
-    "electron": "^30.5.1",
+    "electron": "^30.0.0",
     "electron-builder": "^24.0.0"
   }
 }

@@ -18,7 +18,7 @@ function createWindow() {
     }
   });
   mainWindow.maximize();
-  mainWindow.loadFile('../power-meter-dashboard/index.html');
+  mainWindow.loadFile(path.join(__dirname, 'dashboard/index.html'));
   mainWindow.setTitle('SunFounder 功率计');
 }
 
