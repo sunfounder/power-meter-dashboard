@@ -9,12 +9,15 @@ app.commandLine.appendSwitch('disable-web-security');
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200, height: 850,
+    autoHideMenuBar: true,
     webPreferences: {
+      webSecurity: false,
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     }
   });
+  mainWindow.maximize();
   mainWindow.loadFile('../power-meter-dashboard/index.html');
   mainWindow.setTitle('SunFounder 功率计');
 }
