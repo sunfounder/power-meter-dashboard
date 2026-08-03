@@ -97,6 +97,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </head>
 <body>
 <div class="conn-overlay" id="connOverlay">
+  <button class="btn-icon" onclick="window.electron?.close()" style="position:absolute;top:8px;right:8px;z-index:10" title="关闭">✕</button>
   <div class="conn-box">
     <h2>连接设备</h2>
     <p style="color:var(--dim);font-size:12px;margin-bottom:16px">输入设备 IP 地址</p>
