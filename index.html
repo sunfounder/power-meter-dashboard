@@ -20,7 +20,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 .conn-dot.lost{background:var(--red)}
 .btn-icon{background:none;border:1px solid var(--border);color:var(--text);font-size:14px;padding:3px 8px;border-radius:4px;cursor:pointer}
 .btn-icon:hover{background:#222}
-.main-area{max-width:1100px;margin:0 auto;padding:8px 12px}
+.main-area{max-width:none;margin:0 auto;padding:4px 8px;overflow:hidden}
 .ch-row{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;padding:8px}
 .ch-row.recording{border-color:var(--red)}
 .ch-row.stopped{border-color:var(--accent)}
@@ -538,7 +538,7 @@ function loadFiles(){
       d.forEach(f=>{
         html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
           '<span class="fname">'+f.name+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
-          '<a class="btn-dl" href="'+DEVICE+'/api/download?file='+encodeURIComponent(f.name)+'" title="下载"><i class="fa fa-download"></i></a>'+
+          '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="下载"><i class="fa fa-download"></i></a>'+
           '<button class="btn-del" onclick="if(confirm(\'删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="删除"><i class="fa fa-trash"></i></button></div>';
       });
       el.innerHTML=html;
@@ -640,6 +640,16 @@ if(window.electron){
 }
 
 // ── Download .dat → convert to CSV client-side ──
+async function downloadCSVFile(fname){
+  const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
+  if(!resp.ok){toast('下载失败');return;}
+  const buf=await resp.arrayBuffer();
+  const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
+  for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
+  const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
+  URL.revokeObjectURL(a.href);toast('CSV 已下载');
+}
 async function downloadCSV(i){
   if(!recFiles[i])return;
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(recFiles[i]));
