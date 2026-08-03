@@ -114,6 +114,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">✕</button>
   </div>
 </div>
 <div class="main-area" id="channelList"></div>
@@ -144,6 +147,13 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="modal-overlay" id="dlOverlay">
+  <div class="modal" style="text-align:center">
+    <h2 id="dlStatus">下载中...</h2>
+    <div style="height:4px;background:#1a1a1a;border-radius:2px;margin:12px 0"><div id="dlBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s"></div></div>
+    <button class="btn-buzz" onclick="closeModal('dlOverlay')" id="dlCloseBtn" style="display:none">关闭</button>
+  </div>
+</div>
 <div class="modal-overlay" id="stopOverlay">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">自动停止条件</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
@@ -641,7 +651,9 @@ if(window.electron){
 }
 
 // ── Download .dat → convert to CSV client-side ──
-async function downloadCSVFile(fname){
+async window.addEventListener('resize',()=>{charts.forEach(c=>c?.resize());});
+
+function downloadCSVFile(fname){
   toast('下载中...');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
   if(!resp.ok){toast('下载失败');return;}
