@@ -654,7 +654,7 @@ if(window.electron){
 // ── Download .dat → convert to CSV client-side ──
 window.addEventListener('resize',()=>{charts.forEach(c=>c?.resize());});
 
-function downloadCSVFile(fname){
+async function downloadCSVFile(fname){
   toast('下载中...');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
   if(!resp.ok){toast('下载失败');return;}
