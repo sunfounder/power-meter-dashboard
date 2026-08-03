@@ -583,6 +583,7 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openSettings(){
   document.getElementById('settingsOverlay').classList.add('show');
   api('/api/settings').then(d=>{
+    console.log('settings response:',d);
     if(!d)return;
     document.getElementById('setDevName').value=d.device_name||'';
     document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
