@@ -8,7 +8,7 @@ app.commandLine.appendSwitch('disable-web-security');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200, height: 850,
+    width: 1200, height: 850, frame: false,
     autoHideMenuBar: true,
     webPreferences: {
       webSecurity: false,
@@ -39,6 +39,11 @@ function log(msg) {
   fs.appendFileSync(getLogPath(), line);
   console.log(msg);
 }
+
+// IPC: window controls
+ipcMain.on('min', () => mainWindow.minimize());
+ipcMain.on('max', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
+ipcMain.on('close', () => mainWindow.close());
 
 // IPC: log from renderer
 ipcMain.on('log', (e, msg) => log('[WEB] ' + msg));
