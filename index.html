@@ -627,7 +627,16 @@ if('serviceWorker' in navigator){
 }
 if(window.electron){
   document.getElementById('btnSaveLog').style.display='block';
-  const orig=api;api=function(p,o){window.electron.apiLog({url:p,m:o?.method||'GET'});return orig(p,o);};
+  const orig=api;api=function(p,o){
+  const full=DEVICE+p;
+  return orig(p,o).then(r=>{
+    window.electron.apiLog({url:p,full,ok:r!==null,ts:Date.now()});
+    return r;
+  }).catch(e=>{
+    window.electron.apiLog({url:p,full,error:e.message,ts:Date.now()});
+    return null;
+  });
+};
 }
 
 // ── Download .dat → convert to CSV client-side ──
