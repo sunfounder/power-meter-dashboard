@@ -692,17 +692,9 @@ static void handleSensors(AsyncWebServerRequest *request) {
 
 // GET /api/logs
 static void handleLogs(AsyncWebServerRequest *request) {
-  auto &log = WebLog::getInstance();
-  JsonDocument doc;
-  doc["total"] = log.total();
-  doc["count"] = log.count();
-  JsonArray arr = doc["lines"].to<JsonArray>();
-  for (int i = 0; i < log.count(); i++) {
-    arr.add(log.getLine(i));
-  }
-  String json;
-  serializeJson(doc, json);
-  request->send(200, "application/json", json);
+  const char *s = WebLog::getInstance().loadAll();
+  request->send(200, "text/plain; charset=utf-8", s);
+  free((void*)s);
 }
 
 // GET /api/files
