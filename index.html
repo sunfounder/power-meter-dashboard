@@ -641,8 +641,10 @@ if(window.electron){
 
 // ── Download .dat → convert to CSV client-side ──
 async function downloadCSVFile(fname){
+  toast('下载中...');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
   if(!resp.ok){toast('下载失败');return;}
+  toast('转换中...');
   const buf=await resp.arrayBuffer();
   const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
   for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
