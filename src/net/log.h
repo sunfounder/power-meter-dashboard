@@ -11,6 +11,8 @@ public:
   static WebLog &getInstance();
   void begin();
   void log(const char *fmt, ...);
+  // Set true once LittleFS is mounted (from DataRecorder::begin)
+  static bool fsReady;
 
   int count() const { return _count; }
   int total() const { return _total; }

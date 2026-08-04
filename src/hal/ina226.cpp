@@ -122,13 +122,6 @@ INA226::Measurement INA226::readAll() {
   m.current_mA = (shunt_mV / (_shunt_mohm / 1000.0f));
   m.power_mW   = bus_V * m.current_mA;
 
-  // Per-instance debug: first 3 readings of each channel
-  if (dbg_cnt < 20) {
-    Serial.printf("[INA] 0x%02X: RAW shunt_raw=%d(%.3fmV) bus=%d(%.3fV) I_calc=%.1fmA\n",
-                  _addr, shunt_raw, shunt_mV, bus_raw, bus_V, m.current_mA);
-    dbg_cnt++;
-  }
-
   return m;
 }
 

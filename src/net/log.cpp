@@ -3,6 +3,7 @@
 #include <cstdio>
 
 WebLog &WebLog::getInstance() { static WebLog i; return i; }
+bool WebLog::fsReady = false;
 WebLog::WebLog() : _head(0), _count(0), _total(0) { memset(_buf, 0, sizeof(_buf)); }
 
 void WebLog::begin() {}
@@ -26,6 +27,7 @@ void WebLog::log(const char *fmt, ...) {
 }
 
 void WebLog::_writeToFile(const char *line) {
+  if (!fsReady) return;  // LittleFS not mounted yet — skip to avoid vfs errors
   File f = LittleFS.open(LOG_PATH, FILE_APPEND);
   if (!f) return;
   f.println(line);

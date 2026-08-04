@@ -153,10 +153,8 @@ void setup() {
   show_splash_screen();
   power_meter_init();
 
-  // ── Step 3: Restart WiFi ──
-  PowerMeterWebServer::getInstance().startAP();
+  // ── Step 3: Web server (WiFi already up from Step 1 — no restart) ──
   PowerMeterWebServer::getInstance().begin();
-  printAPDiagnostics();
 }
 
 /* ──────────────── Loop ──────────────── */

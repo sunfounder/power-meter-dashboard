@@ -44,14 +44,11 @@ bool MeasurementEngine::begin() {
   // Initialize INA226 chips
   int ina_ok = 0;
   for (int i = 0; i < 4; i++) {
-    Serial.printf("[ME] INA226 CH%d (0x%02X): ", i + 1, _ina226[i].getAddr());
     if (_ina226[i].begin()) {
-      Serial.println("OK");
       _connected[i] = true;
       WebLog::getInstance().log("INA226 CH%d (0x%02X) OK", i + 1, _ina226[i].getAddr());
       ina_ok++;
     } else {
-      Serial.println("NOT FOUND");
       WebLog::getInstance().log("INA226 CH%d (0x%02X) NOT FOUND", i + 1, _ina226[i].getAddr());
     }
   }

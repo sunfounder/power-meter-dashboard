@@ -1,5 +1,6 @@
 #include "record.h"
 #include "config.h"
+#include "../net/log.h"
 #include <time.h>
 
 DataRecorder &DataRecorder::getInstance() {
@@ -21,6 +22,7 @@ bool DataRecorder::begin() {
     Serial.println("[DR] LittleFS mount failed!");
     return false;
   }
+  WebLog::fsReady = true;
   Serial.printf("[DR] LittleFS mounted, total=%dKB, used=%dKB\n",
                 LittleFS.totalBytes() / 1024,
                 LittleFS.usedBytes() / 1024);
