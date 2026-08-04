@@ -475,7 +475,7 @@ function up(){
     }
     // keep channel names as CH1-CH4, don't sync from server
     document.getElementById('cc'+i).className='ch-conn-bar'+(ok?' on':'');
-    for(let j=0;j<4;j++){const u=document.getElementById('cu'+i+'_'+j);if(u)u.style.background=ok?C[j]:'#333';}
+    for(let j=0;j<4;j++){const u=document.getElementById('cu'+i+'_'+j);if(u)u.style.background=serHidden[i][j]?'#333':(ok?C[j]:'#333');}
     // Update temperature unit label
     const tu=document.getElementById('cu'+i+'_3');if(tu)tu.textContent=ut();
     const btn=document.getElementById('cb'+i);
