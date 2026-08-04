@@ -728,6 +728,7 @@ function checkUpdate() {
     if (window.electron && zip) {
       // Background download; progress shown on the button itself
       updState.phase = 'downloading'; updState.ver = remoteVer; updState.url = zip.browser_download_url;
+      updState.changelog = rel.body || '';
       updBtn('下载中 0%...');
       toast('发现新版本 v' + remoteVer + '，后台下载中，可继续操作');
       window.electron.downloadUpdate(zip.browser_download_url).then(r => {
@@ -758,6 +759,10 @@ function applyUpdate() {
   if (!confirm('应用更新到 v' + updState.ver + '?\n应用将自动关闭并重启为新版本。')) return;
   updState.phase = 'applying';
   updBtn('正在安装...');
+  // Remember for next launch: show "updated" toast with changelog
+  try {
+    localStorage.setItem('pm_just_updated', JSON.stringify({ v: updState.ver, changelog: updState.changelog || '', ts: Date.now() }));
+  } catch (_) {}
   window.electron.applyUpdate().then(r => {
     if (r && !r.ok) {
       updState.phase = 'ready';
@@ -766,6 +771,20 @@ function applyUpdate() {
     }
     // on success the app quits; nothing more to do
   });
+}
+
+// On startup: if we just updated, show "更新成功 + changelog"
+function showJustUpdated() {
+  try {
+    const j = JSON.parse(localStorage.getItem('pm_just_updated') || 'null');
+    if (j && j.v && j.v === DASH_VER) {
+      localStorage.removeItem('pm_just_updated');
+      localStorage.removeItem('pm_pending');
+      setTimeout(() => {
+        alert('✅ 更新成功！\n\n已升级到 v' + j.v + '\n\n更新内容:\n' + (j.changelog || '(无说明)'));
+      }, 800);
+    }
+  } catch (_) {}
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js');
@@ -787,6 +806,7 @@ if(window.electron){
     }
   });
   updBtnInit();
+  showJustUpdated();
   const orig=api;api=function(p,o){
   const full=DEVICE+p;
   return orig(p,o).then(r=>{
