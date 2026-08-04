@@ -301,7 +301,7 @@ function build(){
       '<div class="ch-main">'+
       '<div class="ch-metrics-box"><div class="ch-top"><span class="ch-name" id="cn'+i+'">'+names[i]+'</span><span class="ch-conn-bar" id="cc'+i+'"></span></div>'+
       '<div class="ch-cards">'+['V','A','W','C'].map((m,j)=>
-        '<div class="m-card"><span class="m-value dim" id="cv'+i+'_'+j+'">---</span><span class="m-unit" id="cu'+i+'_'+j+'" style="background:'+C[j]+'">'+m+'</span></div>'
+        '<div class="m-card"><span class="m-value dim" id="cv'+i+'_'+j+'">---</span><span class="m-unit" id="cu'+i+'_'+j+'" style="background:'+C[j]+';cursor:pointer" onclick="toggleSeries('+i+','+j+')">'+m+'</span></div>'
       ).join('')+'</div></div>'+
       '<div class="ch-chart-box" id="cx'+i+'"></div></div>'+
       '<div class="data-bar">'+
@@ -338,10 +338,18 @@ function saveRecName(i){
   // test name is local — does NOT change channel name on device
 }
 
+function toggleSeries(ch, idx){
+  const c=charts[ch]; if(!c)return;
+  const name=['V','A','W','C'][idx];
+  c.dispatchAction({type:'legendToggleSelect', name:name});
+  const el=document.getElementById('cu'+ch+'_'+idx);
+  if(el)el.style.background=c.getOption().legend.selected[name]===false?'#333':C[idx];
+}
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
   c.setOption({
+    legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true,formatter:params=>{
       let t='';const v=params[0].value[0];const m=Math.floor(v/60);const s=v%60;t=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+'<br/>';
