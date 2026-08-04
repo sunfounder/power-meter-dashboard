@@ -842,15 +842,17 @@ async function downloadCSV(i){
 
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
-  const d=await api('/api/channel/'+i+'/record/all');
+  const d=await api('/api/channel/'+i+'/record/all?limit=600');
   if(!d||!d.length)return;
   const c=charts[i];if(!c)return;
-  sampleCount[i]=d.length;
+  // Note: sampleCount keeps total from /api/status; chart shows last 600
+  sampleCount[i]=Math.max(sampleCount[i]||0,d.length);
   dataStore[i]=d.map(p=>({t:'--',V:p.V,A:p.A,W:p.W,C:p.C}));
+  const base=Math.max(0,sampleCount[i]-d.length);
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
+    const data=d.map((p,j)=>[base+j,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
