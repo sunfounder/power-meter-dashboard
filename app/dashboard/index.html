@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
-<title>SunFounder 功率计</title>
+<title>SunFounder 功率�?/title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
@@ -100,7 +100,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </head>
 <body>
 <div class="conn-overlay" id="connOverlay">
-  <button class="conn-close" onclick="window.electron?.close()" title="关闭">✕</button>
+  <button class="conn-close" onclick="window.electron?.close()" title="关闭">�?/button>
   <div class="conn-box">
     <h2>连接设备</h2>
     <p style="color:var(--dim);font-size:12px;margin-bottom:16px">输入设备 IP 地址</p>
@@ -110,7 +110,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   </div>
 </div>
 <div class="header">
-  <span class="title">SunFounder 功率计</span>
+  <span class="title">SunFounder 功率�?/span>
   <div class="right">
     <span class="ambient" id="ambTemp">--.-</span>
     <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
@@ -120,8 +120,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
-    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
-    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">✕</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">�?/button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">�?/button>
   </div>
 </div>
 <div class="main-area" id="channelList"></div>
@@ -138,23 +138,23 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
-    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button>
+    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更�?/button>
     <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
-    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v1.2.1</div>
+    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v1.2.2</div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
     <div id="storageBar" style="margin-bottom:8px"></div>
-    <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
+    <div id="fileList" style="max-height:300px;overflow-y:auto">加载�?..</div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-overlay" id="dlOverlay">
   <div class="modal" style="text-align:center">
-    <h2 id="dlStatus">下载中...</h2>
+    <h2 id="dlStatus">下载�?..</h2>
     <div style="height:4px;background:#1a1a1a;border-radius:2px;margin:12px 0"><div id="dlBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s"></div></div>
     <button class="btn-buzz" onclick="closeModal('dlOverlay')" id="dlCloseBtn" style="display:none">关闭</button>
   </div>
@@ -166,8 +166,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="stop-row"><input type="checkbox" id="stopEn" checked><span class="stop-label">启用自动停止</span></div>
     <div class="stop-row"><input type="checkbox" id="stopChk_V" checked><span class="stop-label">电压低于</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
     <div class="stop-row"><input type="checkbox" id="stopChk_mA" checked><span class="stop-label">电流低于</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">最长录制</span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">下降沿模式（需先高于阈值×1.2再降下来才触发）</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">最长录�?/span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">下降沿模式（需先高于阈值�?.2再降下来才触发）</span></div>
     <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">保存</button>
   </div>
 </div>
@@ -175,9 +175,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">API Docs</h2><button class="btn-icon" onclick="closeModal('apiOverlay')">X</button></div>
     <div style="font-size:12px;line-height:1.6">
-      <b>GET /ping</b> — health check → "pong"<br>
-      <b>GET /api/status</b> — all channels + recording states<br>
-      <b>GET /api/files</b> — list CSV files<br>
+      <b>GET /ping</b> �?health check �?"pong"<br>
+      <b>GET /api/status</b> �?all channels + recording states<br>
+      <b>GET /api/files</b> �?list CSV files<br>
       <b>POST /api/channel/{0-3}/record/start</b> body: name=test<br>
       <b>POST /api/channel/{0-3}/record/stop</b><br>
       <b>POST /api/channel/{0-3}/name</b> body: name=CH1<br>
@@ -193,7 +193,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </div>
 
 <script>
-const DASH_VER='1.2.1'; // bump with each release
+const DASH_VER='1.2.2'; // bump with each release
 let DEVICE='',pollTimer=null;
 const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
 const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
@@ -320,8 +320,8 @@ function build(){
       '<b style="color:var(--accent)">自动停止条件 (0=禁用)</b> '+
       'V &lt; <input type="number" id="sv'+i+'" value="0.5" step="0.1" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">V '+
       'A &lt; <input type="number" id="sm'+i+'" value="0.01" step="0.001" min="0" style="width:60px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">A '+
-      '最大 <input type="number" id="sd'+i+'" value="8" step="0.5" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">h'+
-      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 下降沿</label>'+
+      '最�?<input type="number" id="sd'+i+'" value="8" step="0.5" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">h'+
+      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 下降�?/label>'+
       '</div>';
     l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
   }
@@ -339,7 +339,7 @@ function saveRecName(i){
   if(!v)return;pfx[i]=v;
   document.getElementById('rn'+i).textContent=v;
   document.getElementById('rng'+i).classList.remove('editing');
-  // test name is local — does NOT change channel name on device
+  // test name is local �?does NOT change channel name on device
 }
 
 function toggleSeries(ch, idx){
@@ -416,7 +416,7 @@ function poll(){
             ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
             ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
-        toast('CH'+(i+1)+' 录制已停止');
+        toast('CH'+(i+1)+' 录制已停�?);
         loadFiles();
       }
       // Refresh while stopped: recover stopped state from device
@@ -525,7 +525,7 @@ function tr(i){
   if(!lastData||!lastData.channels[i].connected){toast('CH'+(i+1)+' offline');return;}
   const btn=document.getElementById('cb'+i);
 
-  if(recState[i]===0){ // IDLE → START RECORDING
+  if(recState[i]===0){ // IDLE �?START RECORDING
     recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;clearedFile[i]=false;
     document.getElementById('cr'+i).classList.add('recording');
     document.getElementById('cr'+i).classList.remove('stopped');
@@ -541,7 +541,7 @@ function tr(i){
     document.getElementById('rn'+i).textContent=pfx[i];
     api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
   }
-  else if(recState[i]===1){ // RECORDING → STOP
+  else if(recState[i]===1){ // RECORDING �?STOP
     recState[i]=2;
     document.getElementById('cr'+i).classList.remove('recording');
     document.getElementById('cr'+i).classList.add('stopped');
@@ -560,7 +560,7 @@ function tr(i){
       });
     });
   }
-  else if(recState[i]===2){ // STOPPED → RESET
+  else if(recState[i]===2){ // STOPPED �?RESET
     recState[i]=0;
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='REC';btn.className='btn-rec go';
@@ -582,7 +582,7 @@ function delRecFile(i){
   if(!recFiles[i])return;
   if(!confirm('Delete '+recFiles[i]+'?'))return;
   api('/api/delete?file='+encodeURIComponent(recFiles[i]),{method:'POST'}).then(r=>{
-    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('已删除');}
+    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('已删�?);}
     else toast('Delete failed');
   });
 }
@@ -600,9 +600,9 @@ let selectedFiles=[];
 function loadFiles(){
   api('/api/files').then(d=>{
     const el=document.getElementById('fileList');
-    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文�?(最�?+MAX_FILES+')</span>';}
     else{
-      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>';
+      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文�?/span>';
       d.forEach(f=>{
         html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
           '<span class="fname" title="'+f.name+'">'+f.name.replace('.dat','')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
@@ -627,7 +627,7 @@ function onFileCheck(){
 function delSelected(){
   const cbs=document.querySelectorAll('.file-cb:checked');
   if(!cbs.length)return;
-  if(!confirm('删除 '+cbs.length+' 个文件?'))return;
+  if(!confirm('删除 '+cbs.length+' 个文�?'))return;
   Promise.all(Array.from(cbs).map(cb=>
     api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
   )).then(()=>loadFiles());
@@ -660,10 +660,10 @@ function ut(){return tempUnit==='F'?'F':'C';}
 function calibrateAmbTemp(){
   const real=parseFloat(document.getElementById('calTemp').value);
   if(isNaN(real)){toast('输入实际温度');return;}
-  if(!lastData||lastData.ambient_temp_C==null){toast('无温度数据');return;}
+  if(!lastData||lastData.ambient_temp_C==null){toast('无温度数�?);return;}
   const offset=(real-lastData.ambient_temp_C).toFixed(1);
   api('/api/settings',{method:'POST',body:new URLSearchParams({amb_temp_offset:offset})}).then(()=>{
-    toast('校准完成，偏移: '+offset+'°C');
+    toast('校准完成，偏�? '+offset+'°C');
   });
 }
 function saveWiFi(){
@@ -675,30 +675,30 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 function saveLog(){
-  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保存');else toast('取消')});
+  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保�?);else toast('取消')});
 }
 function checkUpdate(){
-  toast('正在检查更新...');
+  toast('正在检查更�?..');
   fetch('https://api.github.com/repos/sunfounder/power-meter-dashboard/releases/latest')
   .then(r=>r.json()).then(rel=>{
-    if(!rel||!rel.tag_name){toast('检查失败');return;}
+    if(!rel||!rel.tag_name){toast('检查失�?);return;}
     const remoteVer=String(rel.tag_name).replace(/^v/,'');
     if(remoteVer!==DASH_VER){
       const zip=(rel.assets||[]).find(a=>a.name.endsWith('.zip'));
-      const msg='发现新版本 v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说明)')+'\n\n'+(zip?'点击确定下载新版本':'点击确定查看 Release');
+      const msg='发现新版�?v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说�?')+'\n\n'+(zip?'点击确定下载新版�?:'点击确定查看 Release');
       if(confirm(msg)){
         const url=zip?zip.browser_download_url:rel.html_url;
         if(window.electron&&zip){
           toast('正在下载更新...');
           window.electron.doUpdate(url).then(r=>{
-            if(r&&r.ok)toast('下载完成，正在安装...');
+            if(r&&r.ok)toast('下载完成，正在安�?..');
             else toast('更新失败: '+(r&&r.error||'未知错误'));
           });
         }else if(window.electron){window.electron.openExternal(url);}
         else{window.open(url,'_blank');}
       }
-    }else toast('已是最新 v'+DASH_VER);
-  }).catch(()=>toast('检查失败(需联网)'));
+    }else toast('已是最�?v'+DASH_VER);
+  }).catch(()=>toast('检查失�?需联网)'));
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js');
@@ -721,11 +721,11 @@ if(window.electron){
 };
 }
 
-// ── Download .dat → convert to CSV client-side ──
+// ── Download .dat �?convert to CSV client-side ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
 
 async function downloadCSVFile(fname){
-  toast('下载中...');
+  toast('下载�?..');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
   if(!resp.ok){toast('下载失败');return;}
   const buf=await resp.arrayBuffer();
@@ -759,7 +759,7 @@ async function downloadCSV(i){
   a.download=recFiles[i].replace('.dat','.csv');
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('CSV 已下载');
+  toast('CSV 已下�?);
 }
 
 // ── Pull buffered data to fill chart after page refresh ──
