@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
-<title>SunFounder 鍔熺巼璁?/title>
+<title>SunFounder 功率计</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
@@ -100,84 +100,84 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </head>
 <body>
 <div class="conn-overlay" id="connOverlay">
-  <button class="conn-close" onclick="window.electron?.close()" title="鍏抽棴">鉁?/button>
+  <button class="conn-close" onclick="window.electron?.close()" title="关闭">✕</button>
   <div class="conn-box">
-    <h2>杩炴帴璁惧</h2>
-    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">杈撳叆璁惧 IP 鍦板潃</p>
+    <h2>连接设备</h2>
+    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">输入设备 IP 地址</p>
     <input id="connIP" placeholder="192.168.4.1" onkeydown="if(event.key==='Enter')doConnect()" autofocus>
     <div class="conn-err" id="connErr"></div>
-    <button class="conn-btn" onclick="doConnect()">杩炴帴</button>
+    <button class="conn-btn" onclick="doConnect()">连接</button>
   </div>
 </div>
 <div class="header">
-  <span class="title">SunFounder 鍔熺巼璁?/span>
+  <span class="title">SunFounder 功率计</span>
   <div class="right">
     <span class="ambient" id="ambTemp">--.-</span>
     <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
     <span class="conn-dot lost" id="connDot"></span>
-    <button class="btn-icon" onclick="openFiles()" title="鏂囦欢"><i class="fa fa-folder"></i></button>
-    <button class="btn-icon" onclick="openSettings()" title="璁剧疆"><i class="fa fa-gear"></i></button>
-    <button class="btn-icon" onclick="refreshAll()" title="鍒锋柊"><i class="fa fa-rotate"></i></button>
-    <button class="btn-icon" onclick="window.open('docs.html')" title="API 鏂囨。" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
-    <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="鏈€灏忓寲" style="padding:3px 6px">_</button>
-    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="鏈€澶у寲" style="padding:3px 6px">鈻?/button>
-    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="鍏抽棴" style="padding:3px 6px">鉁?/button>
+    <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
+    <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
+    <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">✕</button>
   </div>
 </div>
 <div class="main-area" id="channelList"></div>
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">璁剧疆</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
-    <div class="section"><label>璁惧 IP</label><div class="row"><input type="text" id="setIP" readonly style="background:#0a0a0a;color:var(--dim)"><button class="btn-buzz" onclick="disconnect()" style="background:#3a1010;color:var(--red);border-color:var(--red)">鏂紑</button></div></div>
-    <div class="section"><label>璁惧鍚嶇О</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
-    <div class="section"><label>AP 瀵嗙爜</label><div class="row"><div class="pw-group"><input type="password" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="pw-eye" onclick="togglePw('setApPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)">淇濆瓨</button></div></div>
-    <div class="section"><label>WiFi 杩炴帴</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><div class="pw-group"><input type="password" id="setWifiPass" placeholder="Password"><button class="pw-eye" onclick="togglePw('setWifiPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveWiFi()">杩炴帴</button></div></div>
-    <div class="section"><label>鏃跺尯</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">设置</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
+    <div class="section"><label>设备 IP</label><div class="row"><input type="text" id="setIP" readonly style="background:#0a0a0a;color:var(--dim)"><button class="btn-buzz" onclick="disconnect()" style="background:#3a1010;color:var(--red);border-color:var(--red)">断开</button></div></div>
+    <div class="section"><label>设备名称</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
+    <div class="section"><label>AP 密码</label><div class="row"><div class="pw-group"><input type="password" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="pw-eye" onclick="togglePw('setApPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)">保存</button></div></div>
+    <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><div class="pw-group"><input type="password" id="setWifiPass" placeholder="Password"><button class="pw-eye" onclick="togglePw('setWifiPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
+    <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <!-- rotation hidden until LVGL driver supports it -->
-    <div class="section"><label>娓╁害鍗曚綅</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">掳C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">掳F</button></div></div>
-    <div class="section"><label>鐜娓╁害鏍″噯</label><div class="row"><input type="number" id="calTemp" placeholder="瀹為檯娓╁害" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">鏍″噯</button></div></div>
-    <div class="section"><label>閲囨牱闂撮殧</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
-    <div class="section"><button class="btn-restart" onclick="if(confirm('纭閲嶅惎?'))api('/api/restart',{method:'POST'})">閲嶅惎</button>
-    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">妫€鏌ユ洿鏂?/button>
-    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">瀵煎嚭鏃ュ織</button></div>
-    <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">鍥轰欢鐗堟湰: --</div>
+    <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
+    <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
+    <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
+    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button>
+    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
+    <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v1.2.3</div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">鏂囦欢</h2><div><button class="btn-icon" onclick="delSelected()" title="鍒犻櫎閫変腑" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
     <div id="storageBar" style="margin-bottom:8px"></div>
-    <div id="fileList" style="max-height:300px;overflow-y:auto">鍔犺浇涓?..</div>
+    <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-overlay" id="dlOverlay">
   <div class="modal" style="text-align:center">
-    <h2 id="dlStatus">涓嬭浇涓?..</h2>
+    <h2 id="dlStatus">下载中...</h2>
     <div style="height:4px;background:#1a1a1a;border-radius:2px;margin:12px 0"><div id="dlBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s"></div></div>
-    <button class="btn-buzz" onclick="closeModal('dlOverlay')" id="dlCloseBtn" style="display:none">鍏抽棴</button>
+    <button class="btn-buzz" onclick="closeModal('dlOverlay')" id="dlCloseBtn" style="display:none">关闭</button>
   </div>
 </div>
 <div class="modal-overlay" id="stopOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">鑷姩鍋滄鏉′欢</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">自动停止条件</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
     <style>.stop-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}.stop-row input[type=number]{width:80px;padding:6px 8px;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;text-align:right;-moz-appearance:textfield}.stop-row input[type=number]::-webkit-inner-spin-button,.stop-row input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.stop-row input[type=checkbox]{width:16px;height:16px;margin:0;flex-shrink:0}.stop-row .stop-label{}</style>
-    <div class="stop-row"><input type="checkbox" id="stopEn" checked><span class="stop-label">鍚敤鑷姩鍋滄</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_V" checked><span class="stop-label">鐢靛帇浣庝簬</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_mA" checked><span class="stop-label">鐢垫祦浣庝簬</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">鏈€闀垮綍鍒?/span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>灏忔椂</span></div>
-    <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">涓嬮檷娌挎ā寮忥紙闇€鍏堥珮浜庨槇鍊济?.2鍐嶉檷涓嬫潵鎵嶈Е鍙戯級</span></div>
-    <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">淇濆瓨</button>
+    <div class="stop-row"><input type="checkbox" id="stopEn" checked><span class="stop-label">启用自动停止</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_V" checked><span class="stop-label">电压低于</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_mA" checked><span class="stop-label">电流低于</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">最长录制</span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">下降沿模式（需先高于阈值×1.2再降下来才触发）</span></div>
+    <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">保存</button>
   </div>
 </div>
 <div class="modal-overlay" id="apiOverlay">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">API Docs</h2><button class="btn-icon" onclick="closeModal('apiOverlay')">X</button></div>
     <div style="font-size:12px;line-height:1.6">
-      <b>GET /ping</b> 鈥?health check 鈫?"pong"<br>
-      <b>GET /api/status</b> 鈥?all channels + recording states<br>
-      <b>GET /api/files</b> 鈥?list CSV files<br>
+      <b>GET /ping</b> — health check → "pong"<br>
+      <b>GET /api/status</b> — all channels + recording states<br>
+      <b>GET /api/files</b> — list CSV files<br>
       <b>POST /api/channel/{0-3}/record/start</b> body: name=test<br>
       <b>POST /api/channel/{0-3}/record/stop</b><br>
       <b>POST /api/channel/{0-3}/name</b> body: name=CH1<br>
@@ -223,7 +223,7 @@ function setDevice(ip){
   if(pollTimer)clearInterval(pollTimer);
   poll();pollTimer=setInterval(poll,1000);
   // Fetch firmware version once
-  api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='鍥轰欢鐗堟湰: '+d.version;});
+  api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
@@ -249,7 +249,7 @@ function togglePw(id,btn){
   btn.innerHTML=el.type==='password'?'<i class="fa fa-eye"></i>':'<i class="fa fa-eye-slash"></i>';
 }
 function toggleStopPanel(i){stopCh=i;
-  document.getElementById('stopTitle').textContent='CH'+(i+1)+' 鑷姩鍋滄鏉′欢';
+  document.getElementById('stopTitle').textContent='CH'+(i+1)+' 自动停止条件';
   api('/api/settings').then(d=>{
     if(!d||!d.stop_cond)return;
     const sc=d.stop_cond[i];
@@ -312,16 +312,16 @@ function build(){
       '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')"><i class="fa fa-pen"></i></button></div>'+
       '<span class="timer" id="ct'+i+'">00:00</span>'+
       '<button class="btn-rec go" id="cb'+i+'" onclick="tr('+i+')">REC</button>'+
-      '<button class="btn-icon" onclick="toggleStopPanel('+i+')" title="鍋滄鏉′欢" style="font-size:10px;padding:2px 5px;margin-left:2px"><i class="fa fa-cog"></i></button>'+
+      '<button class="btn-icon" onclick="toggleStopPanel('+i+')" title="停止条件" style="font-size:10px;padding:2px 5px;margin-left:2px"><i class="fa fa-cog"></i></button>'+
       '<span class="file-info" id="fi'+i+'"></span>'+
       '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'"><i class="fa fa-caret-down"></i> Log</button></div>'+
       '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>'+
       '<div class="stop-panel" id="sp'+i+'" style="display:none;margin-top:4px;padding:6px 8px;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:6px;font-size:11px">'+
-      '<b style="color:var(--accent)">鑷姩鍋滄鏉′欢 (0=绂佺敤)</b> '+
+      '<b style="color:var(--accent)">自动停止条件 (0=禁用)</b> '+
       'V &lt; <input type="number" id="sv'+i+'" value="0.5" step="0.1" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">V '+
       'A &lt; <input type="number" id="sm'+i+'" value="0.01" step="0.001" min="0" style="width:60px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">A '+
-      '鏈€澶?<input type="number" id="sd'+i+'" value="8" step="0.5" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">h'+
-      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 涓嬮檷娌?/label>'+
+      '最大 <input type="number" id="sd'+i+'" value="8" step="0.5" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">h'+
+      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 下降沿</label>'+
       '</div>';
     l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
   }
@@ -339,7 +339,7 @@ function saveRecName(i){
   if(!v)return;pfx[i]=v;
   document.getElementById('rn'+i).textContent=v;
   document.getElementById('rng'+i).classList.remove('editing');
-  // test name is local 鈥?does NOT change channel name on device
+  // test name is local — does NOT change channel name on device
 }
 
 function toggleSeries(ch, idx){
@@ -413,10 +413,10 @@ function poll(){
           recFiles[i]=r.last_file;
           const fi=document.getElementById('fi'+i);
           fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
-            ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="涓嬭浇" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
-            ' <button onclick="delRecFile('+i+')" title="鍒犻櫎" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+            ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
-        toast('CH'+(i+1)+' 褰曞埗宸插仠姝?);
+        toast('CH'+(i+1)+' 录制已停止');
         loadFiles();
       }
       // Refresh while stopped: recover stopped state from device
@@ -428,8 +428,8 @@ function poll(){
         recFiles[i]=r.last_file;
         const fi=document.getElementById('fi'+i);
         fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
-          ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="涓嬭浇" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
-          ' <button onclick="delRecFile('+i+')" title="鍒犻櫎" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+          ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+          ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         // Load recorded data into chart
         const chIdx=i;
         const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
@@ -525,7 +525,7 @@ function tr(i){
   if(!lastData||!lastData.channels[i].connected){toast('CH'+(i+1)+' offline');return;}
   const btn=document.getElementById('cb'+i);
 
-  if(recState[i]===0){ // IDLE 鈫?START RECORDING
+  if(recState[i]===0){ // IDLE → START RECORDING
     recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;clearedFile[i]=false;
     document.getElementById('cr'+i).classList.add('recording');
     document.getElementById('cr'+i).classList.remove('stopped');
@@ -541,7 +541,7 @@ function tr(i){
     document.getElementById('rn'+i).textContent=pfx[i];
     api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
   }
-  else if(recState[i]===1){ // RECORDING 鈫?STOP
+  else if(recState[i]===1){ // RECORDING → STOP
     recState[i]=2;
     document.getElementById('cr'+i).classList.remove('recording');
     document.getElementById('cr'+i).classList.add('stopped');
@@ -554,13 +554,13 @@ function tr(i){
           recFiles[i]=latest.name||'';
           const fi=document.getElementById('fi'+i);
           fi.innerHTML=' | '+recFiles[i].split('/').pop().replace('.dat','')+
-            ' <a href="#" onclick="downloadCSVFile(\''+recFiles[i]+'\');return false" title="涓嬭浇" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
-            ' <button onclick="delRecFile('+i+')" title="鍒犻櫎" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+            ' <a href="#" onclick="downloadCSVFile(\''+recFiles[i]+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
       });
     });
   }
-  else if(recState[i]===2){ // STOPPED 鈫?RESET
+  else if(recState[i]===2){ // STOPPED → RESET
     recState[i]=0;
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='REC';btn.className='btn-rec go';
@@ -582,7 +582,7 @@ function delRecFile(i){
   if(!recFiles[i])return;
   if(!confirm('Delete '+recFiles[i]+'?'))return;
   api('/api/delete?file='+encodeURIComponent(recFiles[i]),{method:'POST'}).then(r=>{
-    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('宸插垹闄?);}
+    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('已删除');}
     else toast('Delete failed');
   });
 }
@@ -600,14 +600,14 @@ let selectedFiles=[];
 function loadFiles(){
   api('/api/files').then(d=>{
     const el=document.getElementById('fileList');
-    if(!d||!d.length){el.innerHTML='<span style="color:#555">鏃犳枃浠?(鏈€澶?+MAX_FILES+')</span>';}
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
     else{
-      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 涓枃浠?/span>';
+      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>';
       d.forEach(f=>{
         html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
           '<span class="fname" title="'+f.name+'">'+f.name.replace('.dat','')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
-          '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="涓嬭浇"><i class="fa fa-download"></i></a>'+
-          '<button class="btn-del" onclick="if(confirm(\'鍒犻櫎?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="鍒犻櫎"><i class="fa fa-trash"></i></button></div>';
+          '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="下载"><i class="fa fa-download"></i></a>'+
+          '<button class="btn-del" onclick="if(confirm(\'删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="删除"><i class="fa fa-trash"></i></button></div>';
       });
       el.innerHTML=html;
     }
@@ -616,7 +616,7 @@ function loadFiles(){
     if(!s)return;
     const pct=Math.round(s.used_kb/s.total_kb*100);
     document.getElementById('storageBar').innerHTML=
-      '<div style="font-size:10px;color:var(--dim);margin-bottom:2px">'+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 鍙敤)</div>'+
+      '<div style="font-size:10px;color:var(--dim);margin-bottom:2px">'+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 可用)</div>'+
       '<div style="height:4px;background:#1a1a1a;border-radius:2px"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:2px"></div></div>';
   });
 }
@@ -627,7 +627,7 @@ function onFileCheck(){
 function delSelected(){
   const cbs=document.querySelectorAll('.file-cb:checked');
   if(!cbs.length)return;
-  if(!confirm('鍒犻櫎 '+cbs.length+' 涓枃浠?'))return;
+  if(!confirm('删除 '+cbs.length+' 个文件?'))return;
   Promise.all(Array.from(cbs).map(cb=>
     api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
   )).then(()=>loadFiles());
@@ -647,7 +647,7 @@ function openSettings(){
     document.getElementById('rot180').className='toggle-btn'+(r==180?' active':'');
     document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
     document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
-    document.getElementById('fwVer').textContent='鍥轰欢鐗堟湰: '+(d.version||'--');
+    document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
     document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
   });
 }
@@ -659,11 +659,11 @@ function convTemp(c){return tempUnit==='F'?c*9/5+32:c;}
 function ut(){return tempUnit==='F'?'F':'C';}
 function calibrateAmbTemp(){
   const real=parseFloat(document.getElementById('calTemp').value);
-  if(isNaN(real)){toast('杈撳叆瀹為檯娓╁害');return;}
-  if(!lastData||lastData.ambient_temp_C==null){toast('鏃犳俯搴︽暟鎹?);return;}
+  if(isNaN(real)){toast('输入实际温度');return;}
+  if(!lastData||lastData.ambient_temp_C==null){toast('无温度数据');return;}
   const offset=(real-lastData.ambient_temp_C).toFixed(1);
   api('/api/settings',{method:'POST',body:new URLSearchParams({amb_temp_offset:offset})}).then(()=>{
-    toast('鏍″噯瀹屾垚锛屽亸绉? '+offset+'掳C');
+    toast('校准完成，偏移: '+offset+'°C');
   });
 }
 function saveWiFi(){
@@ -675,30 +675,30 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 function saveLog(){
-  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('鏃ュ織宸蹭繚瀛?);else toast('鍙栨秷')});
+  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保存');else toast('取消')});
 }
 function checkUpdate(){
-  toast('姝ｅ湪妫€鏌ユ洿鏂?..');
+  toast('正在检查更新...');
   fetch('https://api.github.com/repos/sunfounder/power-meter-dashboard/releases/latest')
   .then(r=>r.json()).then(rel=>{
-    if(!rel||!rel.tag_name){toast('妫€鏌ュけ璐?);return;}
+    if(!rel||!rel.tag_name){toast('检查失败');return;}
     const remoteVer=String(rel.tag_name).replace(/^v/,'');
     if(remoteVer!==DASH_VER){
       const zip=(rel.assets||[]).find(a=>a.name.endsWith('.zip'));
-      const msg='鍙戠幇鏂扮増鏈?v'+remoteVer+' (褰撳墠 v'+DASH_VER+')\n\n鏇存柊鍐呭:\n'+(rel.body||'(鏃犺鏄?')+'\n\n'+(zip?'鐐瑰嚮纭畾涓嬭浇鏂扮増鏈?:'鐐瑰嚮纭畾鏌ョ湅 Release');
+      const msg='发现新版本 v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说明)')+'\n\n'+(zip?'点击确定下载新版本':'点击确定查看 Release');
       if(confirm(msg)){
         const url=zip?zip.browser_download_url:rel.html_url;
         if(window.electron&&zip){
-          toast('姝ｅ湪涓嬭浇鏇存柊...');
+          toast('正在下载更新...');
           window.electron.doUpdate(url).then(r=>{
-            if(r&&r.ok)toast('涓嬭浇瀹屾垚锛屾鍦ㄥ畨瑁?..');
-            else toast('鏇存柊澶辫触: '+(r&&r.error||'鏈煡閿欒'));
+            if(r&&r.ok)toast('下载完成，正在安装...');
+            else toast('更新失败: '+(r&&r.error||'未知错误'));
           });
         }else if(window.electron){window.electron.openExternal(url);}
         else{window.open(url,'_blank');}
       }
-    }else toast('宸叉槸鏈€鏂?v'+DASH_VER);
-  }).catch(()=>toast('妫€鏌ュけ璐?闇€鑱旂綉)'));
+    }else toast('已是最新 v'+DASH_VER);
+  }).catch(()=>toast('检查失败(需联网)'));
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js');
@@ -721,17 +721,17 @@ if(window.electron){
 };
 }
 
-// 鈹€鈹€ Download .dat 鈫?convert to CSV client-side 鈹€鈹€
+// ── Download .dat → convert to CSV client-side ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
 
 async function downloadCSVFile(fname){
-  toast('涓嬭浇涓?..');
+  toast('下载中...');
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
-  if(!resp.ok){toast('涓嬭浇澶辫触');return;}
+  if(!resp.ok){toast('下载失败');return;}
   const buf=await resp.arrayBuffer();
   const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
   for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
-  toast('杞崲瀹屾垚锛岃閫夋嫨淇濆瓨浣嶇疆');
+  toast('转换完成，请选择保存位置');
   const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
   URL.revokeObjectURL(a.href);
@@ -739,7 +739,7 @@ async function downloadCSVFile(fname){
 async function downloadCSV(i){
   if(!recFiles[i])return;
   const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(recFiles[i]));
-  if(!resp.ok){toast('涓嬭浇澶辫触');return;}
+  if(!resp.ok){toast('下载失败');return;}
   const buf=await resp.arrayBuffer();
   const v=new DataView(buf);
   let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
@@ -759,10 +759,10 @@ async function downloadCSV(i){
   a.download=recFiles[i].replace('.dat','.csv');
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('CSV 宸蹭笅杞?);
+  toast('CSV 已下载');
 }
 
-// 鈹€鈹€ Pull buffered data to fill chart after page refresh 鈹€鈹€
+// ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
   const d=await api('/api/channel/'+i+'/record/all');
   if(!d||!d.length)return;

@@ -12,12 +12,12 @@ $ver = $Version.TrimStart('v')
 gh auth status | Out-Null
 if (-not $?) { Write-Error "gh 未登录: 先运行 gh auth login"; exit 1 }
 
-# ── 1. 升版本号 ──
+# ── 1. 升版本号（UTF-8 无 BOM，避免编码损坏）──
 $idx = Join-Path $root 'web\index.html'
-$raw = Get-Content $idx -Raw
+$raw = [System.IO.File]::ReadAllText($idx, [System.Text.Encoding]::UTF8)
 $raw = $raw -replace "const DASH_VER='[^']*'", "const DASH_VER='$ver'"
 $raw = $raw -replace "Dashboard v[0-9.]+", "Dashboard v$ver"
-Set-Content $idx -Value $raw -NoNewline -Encoding UTF8
+[System.IO.File]::WriteAllText($idx, $raw, [System.Text.UTF8Encoding]::new($false))
 Write-Host "[1/5] version -> $ver"
 
 # ── 2. 同步 web → app/dashboard ──
