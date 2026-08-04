@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<title>SunFounder 功率计</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root{--bg:#080808;--card-bg:#141414;--border:#2a2a2a;--accent:#e27005;--text:#e0e0e0;--dim:#777;--red:#e04040;--green:#3cb84c}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;display:flex;flex-direction:column}
+body.locked .main-area{opacity:0.3;pointer-events:none}
+.header{background:#0c0c0c;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);width:100%;flex-shrink:0;-webkit-app-region:drag}
+.header button,.header .btn-icon,.header .conn-dot,.win-ctrl{-webkit-app-region:no-drag}
+.header .title{font-size:16px;color:var(--accent);font-weight:700}
+.header .right{display:flex;align-items:center;gap:10px}
+.ambient{font-size:12px;color:var(--dim)}
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.conn-dot.lost{background:var(--red)}
+.btn-icon{background:none;border:1px solid var(--border);color:var(--text);font-size:14px;padding:3px 8px;border-radius:4px;cursor:pointer}
+.btn-icon:hover{background:#222}
+.main-area{flex:1;padding:4px 8px;overflow:hidden;display:flex;flex-direction:column;gap:2px;width:100%}
+.ch-row{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:4px}
+.ch-row.recording{border-color:var(--red)}
+.ch-row.stopped{border-color:var(--accent)}
+.ch-main{display:flex;gap:8px;align-items:stretch;flex:1;min-height:0}
+.ch-metrics-box{display:flex;flex-direction:column;gap:4px;background:#111;border:1px solid #222;border-radius:8px;padding:6px 8px;min-width:100px;flex:0 0 110px}
+.ch-top{display:flex;align-items:center;gap:6px}
+.ch-name{font-size:14px;font-weight:700;color:var(--accent)}
+.ch-conn-bar{display:block;height:3px;background:#333;border-radius:2px}
+.ch-conn-bar.on{background:var(--accent)}
+.ch-cards{display:grid;grid-template-columns:1fr;gap:2px}
+.m-card{background:#0a0a0a;border:1px solid #222;border-radius:4px;display:flex;align-items:stretch;overflow:hidden}
+.m-value{flex:1;padding:3px 6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.m-unit{padding:3px 7px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;min-width:28px;justify-content:center}
+.ch-chart-box{background:#0a0a0a;border:1px solid #222;border-radius:8px;overflow:hidden;flex:1;min-width:0;min-height:0}
+.data-bar{display:flex;align-items:center;gap:6px;margin-top:6px;padding:4px 8px;background:#0c0c0c;border-radius:6px;border:1px solid #1a1a1a;font-size:11px;flex-wrap:wrap}
+.rec-name-group{display:flex;align-items:center;gap:4px}
+.rec-name{color:var(--dim);font-size:10px}
+.rec-name-input{border:1px solid var(--accent);background:#0a0a0a;color:var(--text);font-size:10px;padding:1px 4px;border-radius:3px;width:100px;display:none}
+.rec-name-group.editing .rec-name{display:none}
+.rec-name-group.editing .rec-name-input{display:inline-block}
+.rec-name-group.editing .btn-edit-rec{display:none}
+.btn-edit-rec{background:none;border:none;color:var(--dim);cursor:pointer;font-size:10px;padding:1px 3px}
+.btn-edit-rec:hover{color:var(--accent)}
+.timer{font-weight:700;font-size:14px;min-width:50px}
+.samples{color:var(--dim);font-size:10px}
+.btn-rec{padding:3px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;min-width:60px}
+.btn-rec.go{background:var(--red);color:#fff}
+.btn-rec.stop{background:#444;color:#fff}
+.btn-rec.reset{background:var(--accent);color:#fff}
+.file-info{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--dim)}
+.file-info a{color:var(--accent);text-decoration:none}
+.file-info button{background:none;border:none;color:var(--red);cursor:pointer;font-size:10px}
+.btn-log{background:none;border:none;color:var(--dim);cursor:pointer;font-size:10px;padding:2px 8px;margin-left:auto}
+.btn-log:hover{color:var(--accent)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;z-index:200;opacity:0;transition:opacity 0.3s}
+.toast.show{opacity:1}
+.conn-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:300}
+.conn-overlay.hide{display:none}
+.conn-close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;z-index:10}
+.conn-close:hover{color:var(--red)}
+.conn-box{position:absolute;top:0;left:0;right:0;bottom:0;background:#0c0c0c;padding:200px 40px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.conn-box h2{color:var(--accent);margin-bottom:8px}
+.conn-box input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:6px;background:#0a0a0a;color:var(--text);font-size:18px;text-align:center;font-family:monospace;margin-bottom:12px}
+.conn-box .conn-btn{background:var(--accent);color:#fff;border:none;padding:10px 40px;border-radius:6px;cursor:pointer;font-size:15px;font-weight:700;width:100%}
+.conn-box .conn-err{color:var(--red);font-size:11px}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:100;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:#181818;border:1px solid var(--border);border-radius:10px;padding:20px 24px;width:92%;max-width:480px;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:16px;color:var(--accent);margin-bottom:10px}
+.modal .section{margin-bottom:10px}
+.modal .section label{display:block;font-size:11px;color:var(--dim)}
+.modal .section input:not([type=number]){padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%}
+.modal .section .row{display:flex;gap:8px}.modal .section .row input{flex:1}
+.modal .section .row{display:flex;gap:8px}.modal .section .row input{flex:1}
+.btn-buzz{background:#2a2a2a;color:var(--accent);border:1px solid var(--accent);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px}
+.btn-restart{background:#3a1010;color:var(--red);border:1px solid var(--red);padding:7px 18px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;width:100%}
+.toggle-group{display:flex;border-radius:4px;overflow:hidden}
+.toggle-btn{flex:1;padding:6px 12px;border:none;cursor:pointer;font-size:12px;text-align:center;background:#2a2a2a;color:var(--dim)}
+.toggle-btn.active{background:var(--accent);color:#fff}
+.toggle-btn:first-child{border-radius:4px 0 0 4px}
+.toggle-btn:last-child{border-radius:0 4px 4px 0}
+.toggle-btn+.toggle-btn{border-left:1px solid var(--border)}
+.file-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+.file-row .fname{flex:1;color:var(--text)}.file-row .fsize{color:#555;font-size:10px}
+.btn-dl{background:var(--accent);color:#fff;padding:3px 9px;border:none;border-radius:3px;cursor:pointer;font-size:10px;text-decoration:none}
+.btn-del{background:#2a2a2a;color:var(--red);padding:3px 7px;border:none;border-radius:3px;cursor:pointer;font-size:10px}
+.pw-group{position:relative;display:flex;flex:1}
+.pw-group input{flex:1;padding-right:30px}
+.pw-group .pw-eye{position:absolute;right:0;top:0;bottom:0;width:28px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px}
+.data-scroll{max-height:200px;overflow-y:auto;display:none;margin-top:4px;background:#0a0a0a;border-radius:4px;padding:4px}
+.data-table{width:100%;font-size:9px;border-collapse:collapse}
+.data-table th{color:var(--dim);padding:2px 4px;text-align:center}
+.data-table td{padding:1px 4px;color:var(--text);text-align:center}
+</style>
+</head>
+<body>
+<div class="conn-overlay" id="connOverlay">
+  <button class="conn-close" onclick="window.electron?.close()" title="关闭">✕</button>
+  <div class="conn-box">
+    <h2>连接设备</h2>
+    <p style="color:var(--dim);font-size:12px;margin-bottom:16px">输入设备 IP 地址</p>
+    <input id="connIP" placeholder="192.168.4.1" onkeydown="if(event.key==='Enter')doConnect()" autofocus>
+    <div class="conn-err" id="connErr"></div>
+    <button class="conn-btn" onclick="doConnect()">连接</button>
+  </div>
+</div>
+<div class="header">
+  <span class="title">SunFounder 功率计</span>
+  <div class="right">
+    <span class="ambient" id="ambTemp">--.-</span>
+    <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
+    <span class="conn-dot lost" id="connDot"></span>
+    <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
+    <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
+    <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
+    <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">✕</button>
+  </div>
+</div>
+<div class="main-area" id="channelList"></div>
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">设置</h2><button class="btn-icon" onclick="closeModal('settingsOverlay')">X</button></div>
+    <div class="section"><label>设备 IP</label><div class="row"><input type="text" id="setIP" readonly style="background:#0a0a0a;color:var(--dim)"><button class="btn-buzz" onclick="disconnect()" style="background:#3a1010;color:var(--red);border-color:var(--red)">断开</button></div></div>
+    <div class="section"><label>设备名称</label><input type="text" id="setDevName" maxlength="24" onblur="saveSet('device_name',this.value)"></div>
+    <div class="section"><label>AP 密码</label><div class="row"><div class="pw-group"><input type="password" id="setApPass" onblur="saveSet('ap_password',this.value)"><button class="pw-eye" onclick="togglePw('setApPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveSet('ap_password',document.getElementById('setApPass').value)">保存</button></div></div>
+    <div class="section"><label>WiFi 连接</label><div class="row"><input type="text" id="setWifiSSID" placeholder="SSID"><div class="pw-group"><input type="password" id="setWifiPass" placeholder="Password"><button class="pw-eye" onclick="togglePw('setWifiPass',this)"><i class="fa fa-eye"></i></button></div><button class="btn-buzz" onclick="saveWiFi()">连接</button></div></div>
+    <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
+    <!-- rotation hidden until LVGL driver supports it -->
+    <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
+    <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
+    <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
+    <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button>
+    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
+    <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
+    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v'+DASH_VER+'</div>
+  </div>
+</div>
+<div class="modal-overlay" id="filesOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
+    <div id="storageBar" style="margin-bottom:8px"></div>
+    <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="dlOverlay">
+  <div class="modal" style="text-align:center">
+    <h2 id="dlStatus">下载中...</h2>
+    <div style="height:4px;background:#1a1a1a;border-radius:2px;margin:12px 0"><div id="dlBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s"></div></div>
+    <button class="btn-buzz" onclick="closeModal('dlOverlay')" id="dlCloseBtn" style="display:none">关闭</button>
+  </div>
+</div>
+<div class="modal-overlay" id="stopOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0" id="stopTitle">自动停止条件</h2><button class="btn-icon" onclick="closeModal('stopOverlay')">X</button></div>
+    <style>.stop-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}.stop-row input[type=number]{width:80px;padding:6px 8px;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;text-align:right;-moz-appearance:textfield}.stop-row input[type=number]::-webkit-inner-spin-button,.stop-row input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.stop-row input[type=checkbox]{width:16px;height:16px;margin:0;flex-shrink:0}.stop-row .stop-label{}</style>
+    <div class="stop-row"><input type="checkbox" id="stopEn" checked><span class="stop-label">启用自动停止</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_V" checked><span class="stop-label">电压低于</span><input type="number" id="stop_V" value="0.5" step="0.1" min="0"><span>V</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_mA" checked><span class="stop-label">电流低于</span><input type="number" id="stop_mA" value="0.01" step="0.001" min="0"><span>A</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopChk_min" checked><span class="stop-label">最长录制</span><input type="number" id="stop_min" value="8" step="0.5" min="0"><span>小时</span></div>
+    <div class="stop-row"><input type="checkbox" id="stopFall"><span class="stop-label">下降沿模式（需先高于阈值×1.2再降下来才触发）</span></div>
+    <button class="btn-buzz" onclick="saveStopCond();closeModal('stopOverlay')" style="width:100%;margin-top:8px">保存</button>
+  </div>
+</div>
+<div class="modal-overlay" id="apiOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">API Docs</h2><button class="btn-icon" onclick="closeModal('apiOverlay')">X</button></div>
+    <div style="font-size:12px;line-height:1.6">
+      <b>GET /ping</b> — health check → "pong"<br>
+      <b>GET /api/status</b> — all channels + recording states<br>
+      <b>GET /api/files</b> — list CSV files<br>
+      <b>POST /api/channel/{0-3}/record/start</b> body: name=test<br>
+      <b>POST /api/channel/{0-3}/record/stop</b><br>
+      <b>POST /api/channel/{0-3}/name</b> body: name=CH1<br>
+      <b>GET /api/download?file=xxx.csv</b><br>
+      <b>POST /api/delete?file=xxx.csv</b><br>
+      <b>GET/POST /api/settings</b><br>
+      <b>POST /api/wifi</b> body: ssid=X&password=Y<br>
+      <b>POST /api/restart</b><br>
+      <b>POST /api/buzzer/test</b><br>
+      <b>GET /api/logs</b>
+    </div>
+  </div>
+</div>
+
+<script>
+const DASH_VER='1.2.0'; // bump with each release
+let DEVICE='',pollTimer=null;
+const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
+const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
+let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],pfx=['test','test','test','test'];
+let lastTs=0; // dedup
+let recState=[0,0,0,0]; // 0=idle, 1=recording, 2=stopped
+let recFiles=['','','',''];
+let recStart=[0,0,0,0];
+let sampleCount=[0,0,0,0]; // X axis: sample index, buffer+live aligned
+let serHidden=[[false,false,false,false],[false,false,false,false],[false,false,false,false],[false,false,false,false]];
+let clearedFile=[false,false,false,false]; // true after Reset: don't re-show stopped state
+let tempUnit='C';
+let stopCh=-1;
+const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
+const MAX_FILES=10;
+
+function api(p,o){return fetch(DEVICE+p,o).then(r=>r.json()).catch(()=>null)}
+function getSavedIP(){return localStorage.getItem('pm_ip')||''}
+function saveIP(ip){localStorage.setItem('pm_ip',ip)}
+
+function setDevice(ip){
+  DEVICE='http://'+ip;document.getElementById('setIP').value=ip;
+  document.getElementById('connOverlay').classList.add('hide');
+  document.body.classList.remove('locked');saveIP(ip);
+  for(let i=0;i<4;i++){if(charts[i]){charts[i].dispose();charts[i]=null;}}
+  build();
+  if(pollTimer)clearInterval(pollTimer);
+  poll();pollTimer=setInterval(poll,1000);
+  // Fetch firmware version once
+  api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
+}
+function doConnect(){
+  const ip=document.getElementById('connIP').value.trim();
+  if(!ip){document.getElementById('connErr').textContent='Enter IP';return;}
+  document.getElementById('connErr').textContent='Connecting...';
+  fetch('http://'+ip+'/ping').then(r=>{
+    if(r.ok)setDevice(ip);
+    else document.getElementById('connErr').textContent='Not found';
+  }).catch(()=>{document.getElementById('connErr').textContent='Cannot reach '+ip;});
+}
+function disconnect(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  document.body.classList.add('locked');
+  document.getElementById('connDot').className='conn-dot lost';
+  document.getElementById('connOverlay').classList.remove('hide');
+  document.getElementById('connIP').value=getSavedIP();
+  document.getElementById('connIP').focus();
+  document.getElementById('channelList').innerHTML='';
+}
+function togglePw(id,btn){
+  const el=document.getElementById(id);
+  el.type=el.type==='password'?'text':'password';
+  btn.innerHTML=el.type==='password'?'<i class="fa fa-eye"></i>':'<i class="fa fa-eye-slash"></i>';
+}
+function toggleStopPanel(i){stopCh=i;
+  document.getElementById('stopTitle').textContent='CH'+(i+1)+' 自动停止条件';
+  api('/api/settings').then(d=>{
+    if(!d||!d.stop_cond)return;
+    const sc=d.stop_cond[i];
+    document.getElementById('stopEn').checked=sc.enabled;
+    document.getElementById('stopChk_mA').checked=sc.current_threshold_mA>0;
+    document.getElementById('stop_mA').value=sc.current_threshold_mA?(sc.current_threshold_mA/1000).toFixed(3):'0.01';
+    document.getElementById('stopChk_V').checked=sc.voltage_threshold_V>0;
+    document.getElementById('stop_V').value=sc.voltage_threshold_V||'0.5';
+    document.getElementById('stopChk_min').checked=sc.max_duration_min>0;
+    document.getElementById('stop_min').value=sc.max_duration_min?(sc.max_duration_min/60):'8';
+    document.getElementById('stopFall').checked=sc.falling_edge;
+  });
+  document.getElementById('stopOverlay').classList.add('show');
+}
+function saveStopCond(){
+  if(stopCh<0)return;
+  const en=document.getElementById('stopEn').checked?'1':'0';
+  const mA=document.getElementById('stopChk_mA').checked?Math.round(parseFloat(document.getElementById('stop_mA').value)*1000):0;
+  const v=document.getElementById('stopChk_V').checked?parseFloat(document.getElementById('stop_V').value):0;
+  const min=document.getElementById('stopChk_min').checked?Math.round(parseFloat(document.getElementById('stop_min').value)*60):0;
+  const fall=document.getElementById('stopFall').checked?'1':'0';
+  api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:stopCh,stop_en:en,stop_v:v,stop_mA:mA,stop_min:min,stop_fall:fall})});
+}
+function loadStopCond(i){
+  api('/api/settings').then(d=>{
+    if(!d||!d.stop_cond)return;
+    const sc=d.stop_cond[i];
+    document.getElementById('sv'+i).value=sc.v||0.5;
+    document.getElementById('sm'+i).value=(sc.mA/1000).toFixed(3)||0.01;
+    document.getElementById('sd'+i).value=(sc.min/60)||8;
+    document.getElementById('sf'+i).checked=sc.fall;
+  });
+}
+function saveStop(i){
+  const v=document.getElementById('sv'+i).value;
+  const a=parseFloat(document.getElementById('sm'+i).value);
+  const h=parseFloat(document.getElementById('sd'+i).value);
+  const fall=document.getElementById('sf'+i).checked?'1':'0';
+  const en=(parseFloat(v)>0||a>0||h>0)?'1':'0';
+  api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall})});
+}
+(function init(){
+  const ip=(new URLSearchParams(location.search)).get('ip')||getSavedIP();
+  if(ip){document.getElementById('connIP').value=ip;doConnect();}
+  else{document.body.classList.add('locked');document.getElementById('connOverlay').classList.remove('hide');}
+})();
+
+function build(){
+  const l=document.getElementById('channelList');l.innerHTML='';
+  for(let i=0;i<4;i++){
+    const d=document.createElement('div');d.className='ch-row';d.id='cr'+i;
+    d.innerHTML=
+      '<div class="ch-main">'+
+      '<div class="ch-metrics-box"><div class="ch-top"><span class="ch-name" id="cn'+i+'">'+names[i]+'</span><span class="ch-conn-bar" id="cc'+i+'"></span></div>'+
+      '<div class="ch-cards">'+['V','A','W','C'].map((m,j)=>
+        '<div class="m-card"><span class="m-value dim" id="cv'+i+'_'+j+'">---</span><span class="m-unit" id="cu'+i+'_'+j+'" style="background:'+C[j]+';cursor:pointer" onclick="toggleSeries('+i+','+j+')">'+m+'</span></div>'
+      ).join('')+'</div></div>'+
+      '<div class="ch-chart-box" id="cx'+i+'"></div></div>'+
+      '<div class="data-bar">'+
+      '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')"><i class="fa fa-pen"></i></button></div>'+
+      '<span class="timer" id="ct'+i+'">00:00</span>'+
+      '<button class="btn-rec go" id="cb'+i+'" onclick="tr('+i+')">REC</button>'+
+      '<button class="btn-icon" onclick="toggleStopPanel('+i+')" title="停止条件" style="font-size:10px;padding:2px 5px;margin-left:2px"><i class="fa fa-cog"></i></button>'+
+      '<span class="file-info" id="fi'+i+'"></span>'+
+      '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'"><i class="fa fa-caret-down"></i> Log</button></div>'+
+      '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>'+
+      '<div class="stop-panel" id="sp'+i+'" style="display:none;margin-top:4px;padding:6px 8px;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:6px;font-size:11px">'+
+      '<b style="color:var(--accent)">自动停止条件 (0=禁用)</b> '+
+      'V &lt; <input type="number" id="sv'+i+'" value="0.5" step="0.1" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">V '+
+      'A &lt; <input type="number" id="sm'+i+'" value="0.01" step="0.001" min="0" style="width:60px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">A '+
+      '最大 <input type="number" id="sd'+i+'" value="8" step="0.5" min="0" style="width:50px;background:#0a0a0a;border:1px solid #333;color:var(--text);font-size:10px;padding:1px 4px" onchange="saveStop('+i+')">h'+
+      ' <label style="margin-left:4px"><input type="checkbox" id="sf'+i+'" onchange="saveStop('+i+')" checked> 下降沿</label>'+
+      '</div>';
+    l.appendChild(d);setTimeout(()=>ic(i),300+i*100);
+  }
+}
+
+function editRecName(i){
+  const g=document.getElementById('rng'+i);
+  document.getElementById('rni'+i).value=pfx[i];g.classList.add('editing');
+  const inp=document.getElementById('rni'+i);inp.focus();
+  inp.onblur=()=>saveRecName(i);
+  inp.onkeydown=e=>{if(e.key==='Enter')saveRecName(i);};
+}
+function saveRecName(i){
+  const v=document.getElementById('rni'+i).value.trim();
+  if(!v)return;pfx[i]=v;
+  document.getElementById('rn'+i).textContent=v;
+  document.getElementById('rng'+i).classList.remove('editing');
+  // test name is local — does NOT change channel name on device
+}
+
+function toggleSeries(ch, idx){
+  const c=charts[ch]; if(!c)return;
+  const name=['V','A','W','C'][idx];
+  serHidden[ch][idx]=!serHidden[ch][idx];
+  c.setOption({series:[{name:name,lineStyle:{opacity:serHidden[ch][idx]?0:1},itemStyle:{opacity:serHidden[ch][idx]?0:1}}]});
+  const el=document.getElementById('cu'+ch+'_'+idx);
+  if(el)el.style.background=serHidden[ch][idx]?'#333':C[idx];
+}
+function ic(i){
+  const d=document.getElementById('cx'+i);if(!d||charts[i])return;
+  const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
+  c.setOption({
+    legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
+    grid:{left:10,right:10,top:8,bottom:25},
+    tooltip:{trigger:'axis',confine:true,formatter:params=>{
+      let t='';const v=params[0].value[0];const m=Math.floor(v/60);const s=v%60;t=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+'<br/>';
+      params.forEach(p=>{t+=p.marker+' '+p.seriesName+': '+p.value[1].toFixed(3)+'<br/>';});
+      return t;
+    }},
+    dataZoom:[{type:'inside',start:0,end:100}],
+    xAxis:{type:'value',min:0,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
+    yAxis:[
+      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0}
+    ],
+    series:[
+      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none'},
+      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none'},
+      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none'},
+      {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
+    ],animation:false});
+}
+
+function poll(){
+  api('/api/status').then(d=>{
+    if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
+    lastData=d;document.getElementById('connDot').className='conn-dot';
+    if(d.temp_unit){tempUnit=d.temp_unit;}
+    // Highlight scope channel
+    for(let i=0;i<4;i++){
+      const cr=document.getElementById('cr'+i);
+      if(cr)cr.style.borderColor=d.scope_ch>=0&&d.scope_ch==i?'#e27005':'';
+    }
+
+    // Recover recording state after page refresh
+    if(d.recording)for(let i=0;i<4;i++){
+      const r=d.recording[i];if(!r)continue;
+      if(r.active && recState[i]===0){
+        recState[i]=1;
+        sampleCount[i]=r.samples||0;
+        document.getElementById('cr'+i).classList.add('recording');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='STOP';btn.className='btn-rec stop';
+        document.getElementById('rn'+i).textContent=r.name||pfx[i];
+        // Wait for chart to be ready, then load buffer data
+        const chIdx=i;
+        const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+        setTimeout(tryLoad,500);
+      }
+      // Device stopped recording (auto-stop or external) while APP thought it was recording
+      if(!r.active && recState[i]===1){
+        recState[i]=2;
+        document.getElementById('cr'+i).classList.remove('recording');
+        document.getElementById('cr'+i).classList.add('stopped');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='Reset';btn.className='btn-rec reset';
+        if(r.last_file){
+          recFiles[i]=r.last_file;
+          const fi=document.getElementById('fi'+i);
+          fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
+            ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+        }
+        toast('CH'+(i+1)+' 录制已停止');
+        loadFiles();
+      }
+      // Refresh while stopped: recover stopped state from device
+      if(!r.active && recState[i]===0 && r.last_file && !clearedFile[i]){
+        recState[i]=2;
+        document.getElementById('cr'+i).classList.add('stopped');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='Reset';btn.className='btn-rec reset';
+        recFiles[i]=r.last_file;
+        const fi=document.getElementById('fi'+i);
+        fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
+          ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+          ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+        // Load recorded data into chart
+        const chIdx=i;
+        const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+        setTimeout(tryLoad,500);
+      }
+    }
+    up();uc();updateTables();
+  });
+}
+
+function updateTables(){
+  for(let i=0;i<4;i++){
+    const tb=document.getElementById('dtb'+i);if(!tb)continue;
+    const d=dataStore[i];if(!d.length)continue;
+    tb.innerHTML=d.map((r,j)=>
+      '<tr><td>'+(j+1)+'</td><td>'+r.t+'</td><td>'+r.V.toFixed(3)+'</td><td>'+r.A.toFixed(3)+'</td><td>'+r.W.toFixed(3)+'</td><td>'+r.C.toFixed(1)+'</td></tr>'
+    ).join('');
+    const s=tb.closest('.data-scroll');if(!s)continue;
+    if(s.scrollHeight-s.scrollTop-s.clientHeight<20)s.scrollTop=s.scrollHeight;
+  }
+}
+
+// Manual refresh: full page reload (reconnects via saved IP)
+function refreshAll(){ location.reload(); }
+
+function up(){
+  if(!lastData)return;
+  const d=lastData,chs=d.channels;
+  const amb=d.ambient_temp_C;
+  document.getElementById('ambTemp').textContent=(amb==null||amb<-100)?'---':convTemp(amb).toFixed(1)+' '+ut();
+  if(d.timestamp){
+    const dt=new Date(d.timestamp*1000);
+    document.getElementById('pageTime').textContent=
+      ('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)+':'+('0'+dt.getSeconds()).slice(-2);
+  }
+
+  for(let i=0;i<4;i++){
+    const ch=chs[i];if(!ch)continue;const ok=ch.connected;
+    for(let j=0;j<4;j++){
+      const el=document.getElementById('cv'+i+'_'+j);if(!el)continue;
+      if(!ok){el.textContent='---';el.className='m-value dim';continue;}
+      let raw=ch[MKEYS[j]];if(raw==null||isNaN(raw))raw=0;
+      if(j===3&&raw<-100){el.textContent='---';el.className='m-value dim';continue;}
+      if(j===3)raw=convTemp(raw);
+      el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?(raw/1000).toFixed(3):raw.toFixed(1));
+      el.className='m-value';
+    }
+    // keep channel names as CH1-CH4, don't sync from server
+    document.getElementById('cc'+i).className='ch-conn-bar'+(ok?' on':'');
+    for(let j=0;j<4;j++){const u=document.getElementById('cu'+i+'_'+j);if(u)u.style.background=serHidden[i][j]?'#333':(ok?C[j]:'#333');}
+    // Update temperature unit label
+    const tu=document.getElementById('cu'+i+'_3');if(tu)tu.textContent=ut();
+    const btn=document.getElementById('cb'+i);
+    if(btn&&recState[i]===0){if(!ok){btn.disabled=true;btn.style.opacity='0.35'}else{btn.disabled=false;btn.style.opacity=''}}
+  }
+
+  if(d.recording)for(let i=0;i<4;i++){
+    const r=d.recording[i];if(!r||!r.active)continue;
+    if(recState[i]!==1)continue;
+    document.getElementById('ct'+i).textContent=r.elapsed||'00:00';
+    const ch=chs[i];
+    if(ch&&ch.connected){
+      dataStore[i].push({t:r.elapsed,V:ch.bus_voltage_V,A:ch.current_mA/1000,W:(ch.power_mW||0)/1000,C:ch.channel_temp_C});
+    }
+  }
+}
+
+function uc(){
+  if(!lastData)return;
+  for(let i=0;i<4;i++){
+    const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
+    const c=charts[i];if(!c)continue;
+    if(recState[i]!==1)continue;
+    const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
+    const pts=[];
+    for(let m=0;m<4;m++){
+      let v=raw[m];
+      if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
+      pts.push(v||0);
+    }
+    const idx=sampleCount[i]++;
+    const opts={series:[]};
+    for(let m=0;m<4;m++){
+      const data=[...c.getOption().series[m].data];
+      data.push([idx,pts[m]]);
+      opts.series.push({data});
+    }
+    c.setOption(opts,{notMerge:false});
+  }
+}
+
+function tr(i){
+  if(!lastData||!lastData.channels[i].connected){toast('CH'+(i+1)+' offline');return;}
+  const btn=document.getElementById('cb'+i);
+
+  if(recState[i]===0){ // IDLE → START RECORDING
+    recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;clearedFile[i]=false;
+    document.getElementById('cr'+i).classList.add('recording');
+    document.getElementById('cr'+i).classList.remove('stopped');
+    btn.textContent='STOP';btn.className='btn-rec stop';
+    dataStore[i]=[];
+    document.getElementById('dts'+i).style.display='none';
+    document.getElementById('fi'+i).innerHTML='';
+    // Clear chart
+    if(charts[i]){
+      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
+      lastNZ[i]=[0,0,0,0];
+    }
+    document.getElementById('rn'+i).textContent=pfx[i];
+    api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
+  }
+  else if(recState[i]===1){ // RECORDING → STOP
+    recState[i]=2;
+    document.getElementById('cr'+i).classList.remove('recording');
+    document.getElementById('cr'+i).classList.add('stopped');
+    btn.textContent='Reset';btn.className='btn-rec reset';
+    api('/api/channel/'+i+'/record/stop',{method:'POST'}).then(()=>{
+      // Fetch file list to find the newly created file
+      api('/api/files').then(d=>{
+        if(d&&d.length){
+          const latest=d[d.length-1]; // assume last file is ours
+          recFiles[i]=latest.name||'';
+          const fi=document.getElementById('fi'+i);
+          fi.innerHTML=' | '+recFiles[i].split('/').pop().replace('.dat','')+
+            ' <a href="#" onclick="downloadCSVFile(\''+recFiles[i]+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+        }
+      });
+    });
+  }
+  else if(recState[i]===2){ // STOPPED → RESET
+    recState[i]=0;
+    document.getElementById('cr'+i).classList.remove('stopped');
+    btn.textContent='REC';btn.className='btn-rec go';
+    clearedFile[i]=true;
+    document.getElementById('ct'+i).textContent='00:00';
+    document.getElementById('fi'+i).innerHTML='';
+    document.getElementById('dts'+i).style.display='none';
+    document.getElementById('rn'+i).textContent=pfx[i];
+    dataStore[i]=[];
+    recFiles[i]='';
+    // Clear chart
+    if(charts[i]){
+      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
+    }
+  }
+}
+
+function delRecFile(i){
+  if(!recFiles[i])return;
+  if(!confirm('Delete '+recFiles[i]+'?'))return;
+  api('/api/delete?file='+encodeURIComponent(recFiles[i]),{method:'POST'}).then(r=>{
+    if(r&&r.ok){document.getElementById('fi'+i).innerHTML='';recFiles[i]='';toast('已删除');}
+    else toast('Delete failed');
+  });
+}
+
+function td(i){
+  const s=document.getElementById('dts'+i);
+  const show=s.style.display==='block';
+  s.style.display=show?'none':'block';
+  document.getElementById('cl'+i).innerHTML=show?'<i class=\"fa fa-caret-down\"></i> Log':'<i class=\"fa fa-caret-up\"></i> Log';
+}
+
+function openFiles(){document.getElementById('filesOverlay').classList.add('show');loadFiles();}
+let selectedFiles=[];
+
+function loadFiles(){
+  api('/api/files').then(d=>{
+    const el=document.getElementById('fileList');
+    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
+    else{
+      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>';
+      d.forEach(f=>{
+        html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
+          '<span class="fname" title="'+f.name+'">'+f.name.replace('.dat','')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
+          '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="下载"><i class="fa fa-download"></i></a>'+
+          '<button class="btn-del" onclick="if(confirm(\'删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="删除"><i class="fa fa-trash"></i></button></div>';
+      });
+      el.innerHTML=html;
+    }
+  });
+  api('/api/storage').then(s=>{
+    if(!s)return;
+    const pct=Math.round(s.used_kb/s.total_kb*100);
+    document.getElementById('storageBar').innerHTML=
+      '<div style="font-size:10px;color:var(--dim);margin-bottom:2px">'+s.used_kb+'KB / '+s.total_kb+'KB ('+s.free_kb+'KB 可用)</div>'+
+      '<div style="height:4px;background:#1a1a1a;border-radius:2px"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:2px"></div></div>';
+  });
+}
+function onFileCheck(){
+  const cbs=document.querySelectorAll('.file-cb:checked');
+  document.getElementById('btnDelSel').style.display=cbs.length?'inline-block':'none';
+}
+function delSelected(){
+  const cbs=document.querySelectorAll('.file-cb:checked');
+  if(!cbs.length)return;
+  if(!confirm('删除 '+cbs.length+' 个文件?'))return;
+  Promise.all(Array.from(cbs).map(cb=>
+    api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
+  )).then(()=>loadFiles());
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openSettings(){
+  document.getElementById('settingsOverlay').classList.add('show');
+  api('/api/settings').then(d=>{
+    console.log('settings response:',d);
+    if(!d)return;
+    document.getElementById('setDevName').value=d.device_name||'';
+    document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
+    document.getElementById('setTz').value=d.tz_offset||8;
+    // Highlight active toggle buttons
+    const r=parseInt(d.rotation)||0;
+    document.getElementById('rot0').className='toggle-btn'+(r==0?' active':'');
+    document.getElementById('rot180').className='toggle-btn'+(r==180?' active':'');
+    document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
+    document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
+    document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
+    document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
+  });
+}
+function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
+function saveXMin(v){localStorage.setItem('pm_xmin',v);}
+function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
+function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
+function convTemp(c){return tempUnit==='F'?c*9/5+32:c;}
+function ut(){return tempUnit==='F'?'F':'C';}
+function calibrateAmbTemp(){
+  const real=parseFloat(document.getElementById('calTemp').value);
+  if(isNaN(real)){toast('输入实际温度');return;}
+  if(!lastData||lastData.ambient_temp_C==null){toast('无温度数据');return;}
+  const offset=(real-lastData.ambient_temp_C).toFixed(1);
+  api('/api/settings',{method:'POST',body:new URLSearchParams({amb_temp_offset:offset})}).then(()=>{
+    toast('校准完成，偏移: '+offset+'°C');
+  });
+}
+function saveWiFi(){
+  const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
+  api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
+}
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+function saveLog(){
+  if(window.electron)window.electron.saveLog().then(p=>{if(p)toast('日志已保存');else toast('取消')});
+}
+function checkUpdate(){
+  toast('正在检查更新...');
+  fetch('https://sunfounder.github.io/power-meter-dashboard/version.json?t='+Date.now())
+  .then(r=>r.json()).then(remote=>{
+    if(remote.version!==DASH_VER){
+      if(confirm('发现新版本 v'+remote.version+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+remote.changelog+'\n\n是否更新?')){
+        if(window.electron){location.reload(true);}
+        else{caches.delete('power-meter-v1').then(()=>location.reload(true));}
+      }
+    }else toast('已是最新 v'+DASH_VER);
+  }).catch(()=>toast('检查失败'));
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.ready.then(()=>{
+    // Auto check on load
+    setTimeout(checkUpdate,3000);
+  });
+}
+if(window.electron){
+  document.getElementById('btnSaveLog').style.display='block';
+  const orig=api;api=function(p,o){
+  const full=DEVICE+p;
+  return orig(p,o).then(r=>{
+    window.electron.apiLog({url:p,full,ok:r!==null,ts:Date.now()});
+    return r;
+  }).catch(e=>{
+    window.electron.apiLog({url:p,full,error:e.message,ts:Date.now()});
+    return null;
+  });
+};
+}
+
+// ── Download .dat → convert to CSV client-side ──
+window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
+
+async function downloadCSVFile(fname){
+  toast('下载中...');
+  const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
+  if(!resp.ok){toast('下载失败');return;}
+  const buf=await resp.arrayBuffer();
+  const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
+  for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
+  toast('转换完成，请选择保存位置');
+  const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function downloadCSV(i){
+  if(!recFiles[i])return;
+  const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(recFiles[i]));
+  if(!resp.ok){toast('下载失败');return;}
+  const buf=await resp.arrayBuffer();
+  const v=new DataView(buf);
+  let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
+  for(let o=0;o<buf.byteLength;o+=24){
+    csv+=[
+      v.getUint32(o,true),
+      v.getFloat32(o+4,true).toFixed(3),
+      v.getFloat32(o+8,true).toFixed(3),
+      v.getFloat32(o+12,true).toFixed(3),
+      v.getFloat32(o+16,true).toFixed(1),
+      v.getFloat32(o+20,true).toFixed(1)
+    ].join(',')+'\n';
+  }
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=recFiles[i].replace('.dat','.csv');
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('CSV 已下载');
+}
+
+// ── Pull buffered data to fill chart after page refresh ──
+async function loadBufferData(i){
+  const d=await api('/api/channel/'+i+'/record/all');
+  if(!d||!d.length)return;
+  const c=charts[i];if(!c)return;
+  sampleCount[i]=d.length;
+  dataStore[i]=d.map(p=>({t:'--',V:p.V,A:p.A,W:p.W,C:p.C}));
+  const opts={series:[]};
+  for(let m=0;m<4;m++){
+    const key=['V','A','W','C'][m];
+    const data=d.map((p,j)=>[j,parseFloat(p[key])||0]);
+    opts.series.push({data});
+  }
+  c.setOption(opts,{notMerge:false});
+}
+</script>
+</body>
+</html>

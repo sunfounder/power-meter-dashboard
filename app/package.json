@@ -1,0 +1,32 @@
+{
+  "name": "power-meter-desktop",
+  "version": "1.2.0",
+  "description": "SunFounder 功率计桌面应用",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.sunfounder.powermeter",
+    "productName": "SunFounderPowerMeter",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "dashboard/index.html",
+      "dashboard/docs.html",
+      "dashboard/manifest.json",
+      "dashboard/sw.js",
+      "dashboard/version.json"
+    ],
+    "win": {
+      "target": "dir",
+      "signAndEditExecutable": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

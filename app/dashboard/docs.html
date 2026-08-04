@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Power Meter — API 文档</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0c0c0c;color:#ddd;max-width:800px;margin:20px auto;padding:0 16px}
+h1{color:#e27005;font-size:20px}
+h2{color:#e27005;font-size:15px;margin-top:24px;border-bottom:1px solid #2a2a2a;padding-bottom:4px}
+code{background:#1a1a1a;padding:2px 6px;border-radius:3px;font-size:13px;color:#e27005}
+pre{background:#111;border:1px solid #2a2a2a;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+td,th{padding:6px 8px;border:1px solid #2a2a2a;text-align:left}
+th{background:#1a1a1a;color:#e27005}
+</style>
+</head>
+<body>
+<h1>Power Meter — REST API v0.2</h1>
+<p>Base URL: <code>http://&lt;device-ip&gt;</code> | AP: <code>192.168.4.1</code> | STA: 路由器分配</p>
+
+<h2>健康检查</h2>
+<table><tr><th>方法</th><th>路径</th><th>响应</th></tr>
+<tr><td>GET</td><td><code>/ping</code></td><td><code>"pong"</code></td></tr></table>
+
+<h2>实时状态</h2>
+<table><tr><th>方法</th><th>路径</th><th>说明</th></tr>
+<tr><td>GET</td><td><code>/api/status</code></td><td>4 通道数据 + 录制状态 + 时间戳 + 温度单位</td></tr></table>
+<pre>{
+  "timestamp": 1712345678,
+  "channels": [{
+    "bus_voltage_V": 5.003, "current_mA": 12.5, "power_mW": 62.5,
+    "channel_temp_C": 25.3, "connected": true, "name": "CH1"
+  }, ...],
+  "ambient_temp_C": 28.1,
+  "recording": [{"active":true,"elapsed":"00:05","samples":5,"name":"test"}, ...],
+  "temp_unit": "C"
+}</pre>
+
+<h2>录制</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>请求体</th><th>说明</th></tr>
+<tr><td>POST</td><td><code>/api/channel/{0-3}/record/start</code></td><td><code>name=test</code></td><td>开始录制（新建 .dat 文件）</td></tr>
+<tr><td>POST</td><td><code>/api/channel/{0-3}/record/stop</code></td><td>—</td><td>停止 + flush 缓冲区到 Flash</td></tr>
+<tr><td>GET</td><td><code>/api/channel/{0-3}/record/data</code></td><td>—</td><td>RAM 缓冲区数据（刷新恢复用）</td></tr>
+</table>
+
+<h2>文件管理</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>说明</th></tr>
+<tr><td>GET</td><td><code>/api/files</code></td><td>列出 .dat 文件</td></tr>
+<tr><td>GET</td><td><code>/api/download?file=xxx.dat</code></td><td>下载二进制数据（客户端转 CSV）</td></tr>
+<tr><td>POST</td><td><code>/api/delete?file=xxx.dat</code></td><td>删除文件</td></tr>
+</table>
+
+<h2>.dat 二进制格式</h2>
+<pre>每个采样 = 24 bytes (little-endian):
+struct SampleBin {
+  uint32_t timestamp;     // UNIX 时间秒
+  float bus_voltage_V;
+  float current_A;        // 安培
+  float power_W;          // 瓦特
+  float channel_temp_C;   // 摄氏度
+  float ambient_temp_C;
+};
+
+// JS 解析: DataView
+// getUint32(off,true), getFloat32(off+4,true), ...</pre>
+
+<h2>设置</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>支持的参数</th></tr>
+<tr><td>GET</td><td><code>/api/settings</code></td><td>—</td></tr>
+<tr><td>POST</td><td><code>/api/settings</code></td><td><code>device_name</code>, <code>ap_password</code>, <code>wifi_ssid</code>, <code>wifi_password</code>, <code>tz_offset</code>, <code>temp_unit</code> (C/F)</td></tr>
+</table>
+
+<h2>WiFi</h2>
+<table><tr><th>方法</th><th>路径</th><th>请求体</th></tr>
+<tr><td>POST</td><td><code>/api/wifi</code></td><td><code>ssid=X&password=Y</code></td></tr></table>
+
+<h2>其他</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>说明</th></tr>
+<tr><td>POST</td><td><code>/api/restart</code></td><td>重启设备</td></tr>
+<tr><td>POST</td><td><code>/api/buzzer/test</code></td><td>蜂鸣器测试</td></tr>
+<tr><td>GET</td><td><code>/api/logs</code></td><td>设备运行日志</td></tr>
+</table>
+
+<p style="color:#555;font-size:11px;margin-top:16px">更新于 2024年7月 · power-meter-dashboard</p>
+</body>
+</html>
