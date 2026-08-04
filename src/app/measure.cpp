@@ -128,11 +128,11 @@ void MeasurementEngine::_sampleAll() {
       continue;
     }
 
-    // Read NTC with glitch filter (10 consecutive fails = real open)
+    // Read NTC with glitch filter (3 consecutive fails = real open)
     float ntc_v = _ads1115.readVoltage(i);
     float t = _ntc.voltageToTemp(ntc_v);
     if (t < -100) {
-      if (++bad_cnt[i] < 10 && last_temp[i] > -100) t = last_temp[i];
+      if (++bad_cnt[i] < 3 && last_temp[i] > -100) t = last_temp[i];
     } else {
       bad_cnt[i] = 0;
       last_temp[i] = t;
@@ -163,11 +163,11 @@ float MeasurementEngine::_readAmbientTemp() {
   float raw_avg = (float)sum / 16.0f;
   float voltage = raw_avg * 3.3f / 4095.0f;
   float temp = _ntc.voltageToTemp(voltage);
-  // Hold last good value on transient glitches (10 consecutive fails = real open)
+  // Hold last good value on transient glitches (3 consecutive fails = real open)
   static float last_amb = 0;
   static uint8_t amb_bad = 0;
   if (temp < -100) {
-    if (++amb_bad < 10 && last_amb > -100) temp = last_amb;
+    if (++amb_bad < 3 && last_amb > -100) temp = last_amb;
   } else {
     amb_bad = 0;
     last_amb = temp;
