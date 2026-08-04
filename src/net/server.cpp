@@ -560,26 +560,37 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
   int ch = parseChannelFromUrl(request->url());
   if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
 
+  // Limit: only return the most recent N samples (default 600 = 10min @1Hz)
+  // Reading the whole .dat into JSON at once can OOM the AsyncTCP task.
+  int limit = 600;
+  if (request->hasParam("limit")) {
+    limit = request->getParam("limit")->value().toInt();
+  }
+  if (limit < 1) limit = 1;
+  if (limit > 2000) limit = 2000;
+
   auto &rec = DataRecorder::getInstance();
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
 
-  // 1. Read from .dat file (already flushed samples)
+  // 1. Read the TAIL of the .dat file (most recent flushed samples)
   const char *fname = rec.currentFilename(ch);
   if (fname && fname[0] && LittleFS.exists(fname)) {
     File f = LittleFS.open(fname);
     if (f) {
       size_t sz = f.size();
       int n = sz / sizeof(SampleBin);
-      for (int i = 0; i < n; i++) {
+      int skip = n > limit ? n - limit : 0;
+      if (skip > 0) f.seek((size_t)skip * sizeof(SampleBin));
+      for (int i = skip; i < n; i++) {
         SampleBin b;
         if (f.read((uint8_t *)&b, sizeof(SampleBin)) != sizeof(SampleBin)) break;
         JsonObject o = arr.add<JsonObject>();
         o["t"] = b.timestamp;
-        o["V"] = serialized(String(b.bus_voltage_V, 3));
-        o["A"] = serialized(String(b.current_A, 3));
-        o["W"] = serialized(String(b.power_W, 3));
-        o["C"] = serialized(String(b.channel_temp_C, 1));
+        o["V"] = b.bus_voltage_V;   // plain doubles — no String temporaries
+        o["A"] = b.current_A;
+        o["W"] = b.power_W;
+        o["C"] = b.channel_temp_C;
       }
       f.close();
     }
@@ -594,10 +605,10 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
     const SampleBin &b = rec.bufferData(ch)[idx];
     JsonObject o = arr.add<JsonObject>();
     o["t"] = b.timestamp;
-    o["V"] = serialized(String(b.bus_voltage_V, 3));
-    o["A"] = serialized(String(b.current_A, 3));
-    o["W"] = serialized(String(b.power_W, 3));
-    o["C"] = serialized(String(b.channel_temp_C, 1));
+    o["V"] = b.bus_voltage_V;
+    o["A"] = b.current_A;
+    o["W"] = b.power_W;
+    o["C"] = b.channel_temp_C;
   }
 
   String json;
