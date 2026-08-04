@@ -96,6 +96,18 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
+  // Print why we restarted (panic/WDT/soft restart vs normal power-on)
+  esp_reset_reason_t reason = esp_reset_reason();
+  if (reason == ESP_RST_PANIC) {
+    Serial.println("[RST] *** PREVIOUS RUN CRASHED (panic) ***");
+  } else if (reason == ESP_RST_TASK_WDT || reason == ESP_RST_WDT) {
+    Serial.println("[RST] *** PREVIOUS RUN KILLED BY WATCHDOG ***");
+  } else if (reason == ESP_RST_SW) {
+    Serial.println("[RST] previous run: software restart");
+  } else {
+    Serial.printf("[RST] previous reset reason: %d\n", (int)reason);
+  }
+
   // WiFi auto-reconnect: event callback must stay NON-BLOCKING
   // (it runs in WiFi task context — no Serial/WebLog/LittleFS/API calls here)
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
