@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('electron', {
   getLogPath: () => ipcRenderer.invoke('get-log-path'),
   min: () => ipcRenderer.send('min'),
   max: () => ipcRenderer.send('max'),
-  close: () => ipcRenderer.send('close')
+  close: () => ipcRenderer.send('close'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });

@@ -679,15 +679,20 @@ function saveLog(){
 }
 function checkUpdate(){
   toast('正在检查更新...');
-  fetch('https://sunfounder.github.io/power-meter-dashboard/version.json?t='+Date.now())
-  .then(r=>r.json()).then(remote=>{
-    if(remote.version!==DASH_VER){
-      if(confirm('发现新版本 v'+remote.version+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+remote.changelog+'\n\n是否更新?')){
-        if(window.electron){location.reload(true);}
-        else{caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).then(()=>location.reload(true));}
+  fetch('https://api.github.com/repos/sunfounder/power-meter-dashboard/releases/latest')
+  .then(r=>r.json()).then(rel=>{
+    if(!rel||!rel.tag_name){toast('检查失败');return;}
+    const remoteVer=String(rel.tag_name).replace(/^v/,'');
+    if(remoteVer!==DASH_VER){
+      const zip=(rel.assets||[]).find(a=>a.name.endsWith('.zip'));
+      const msg='发现新版本 v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说明)')+'\n\n'+(zip?'点击确定下载新版本':'点击确定查看 Release');
+      if(confirm(msg)){
+        const url=zip?zip.browser_download_url:rel.html_url;
+        if(window.electron)window.electron.openExternal(url);
+        else window.open(url,'_blank');
       }
     }else toast('已是最新 v'+DASH_VER);
-  }).catch(()=>toast('检查失败'));
+  }).catch(()=>toast('检查失败(需联网)'));
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js');

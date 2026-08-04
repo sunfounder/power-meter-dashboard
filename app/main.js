@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -56,3 +56,4 @@ ipcMain.handle('save-log', async () => {
   return null;
 });
 ipcMain.handle('get-log-path', () => '');
+ipcMain.handle('open-external', (e, url) => { shell.openExternal(url); return true; });
