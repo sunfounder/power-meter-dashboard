@@ -14,10 +14,10 @@ class DeviceSettings {
 public:
   // Per-channel auto-stop conditions
   struct StopCond {
-    bool  enabled = false;
-    float voltage_threshold_V  = 0;
-    float current_threshold_mA = 0;
-    uint16_t max_duration_min  = 0;
+    bool  enabled = true;              // default: all enabled
+    float voltage_threshold_V  = 0.5f; // default 0.5V
+    float current_threshold_mA = 10.0f;// default 10mA
+    uint16_t max_duration_min  = 480;  // default 8h
     bool  falling_edge = true;
     bool  armed_V  = false;
     bool  armed_mA = false;
@@ -75,6 +75,9 @@ public:
   void setStopCond(int ch, bool enabled, float v_thresh, float mA_thresh, uint16_t max_min, bool falling);
   void setStopArmed(int ch, bool armed_V, bool armed_mA);
 
+  // Stop conditions persist to LittleFS (NVS too small)
+  void _loadStopConditions();
+  void _saveStopConditions();
 private:
   DeviceSettings();
 
