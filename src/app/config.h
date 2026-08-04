@@ -35,9 +35,8 @@ public:
   const char *deviceName() const { return _device_name; }
   void setDeviceName(const char *name);
 
-  // Channel names
+  // Channel names (fixed CH1-CH4, no storage)
   const char *channelName(int ch) const;
-  void setChannelName(int ch, const char *name);
 
   // WiFi
   const char *wifiSSID() const { return _wifi_ssid; }
@@ -75,16 +74,12 @@ public:
   void setStopCond(int ch, bool enabled, float v_thresh, float mA_thresh, uint16_t max_min, bool falling);
   void setStopArmed(int ch, bool armed_V, bool armed_mA);
 
-  // Stop conditions persist to LittleFS (NVS too small)
-  void _loadStopConditions();
-  void _saveStopConditions();
 private:
   DeviceSettings();
 
   static constexpr const char *NVS_NS = "settings";
 
   char _device_name[32];
-  char _channel_names[4][16];
   char _wifi_ssid[32];
   char _wifi_password[64];
   char _ap_ssid[32];

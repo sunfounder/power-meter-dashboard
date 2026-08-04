@@ -10,7 +10,6 @@ DeviceSettings &DeviceSettings::getInstance() {
 DeviceSettings::DeviceSettings()
     : _sample_interval_ms(1000), _temp_unit('C'), _tz_offset(8), _rotation(0) {
   memset(_device_name, 0, sizeof(_device_name));
-  memset(_channel_names, 0, sizeof(_channel_names));
   memset(_wifi_ssid, 0, sizeof(_wifi_ssid));
   memset(_wifi_password, 0, sizeof(_wifi_password));
   memset(_ap_ssid, 0, sizeof(_ap_ssid));
@@ -20,9 +19,6 @@ DeviceSettings::DeviceSettings()
   strcpy(_device_name, "PowerMeter");
   strcpy(_ap_ssid, "PowerMeter-4CH");
   strcpy(_ap_password, "12345678");
-  for (int i = 0; i < 4; i++) {
-    snprintf(_channel_names[i], sizeof(_channel_names[i]), "CH%d", i + 1);
-  }
 }
 
 void DeviceSettings::begin() {
@@ -66,10 +62,7 @@ void DeviceSettings::load() {
   for (int i = 0; i < 4; i++) {
     char key[8];
     snprintf(key, sizeof(key), "ch%d_name", i);
-    s = prefs.getString(key, "");
-    if (!s.isEmpty()) {
-      strncpy(_channel_names[i], s.c_str(), sizeof(_channel_names[i]) - 1);
-    }
+    prefs.getString(key, "");  // legacy key — no longer stored, ignore
   }
 
   _sample_interval_ms = prefs.getUInt("sample_ms", 1000);
@@ -81,14 +74,18 @@ void DeviceSettings::load() {
   prefs.end();
 
   // Stop conditions: stored in LittleFS (NVS too small for 20 keys)
-  _loadStopConditions();
+  size_t len = prefs.getBytes("stop_cond", _stop, sizeof(_stop));
+  if (len == 0) {
+    Serial.println("[SET] no stop_cond in NVS — using defaults (all enabled)");
+  } else {
+    Serial.println("[SET] stop conditions loaded from NVS");
+  }
+
+  prefs.end();
 
   Serial.println("[SET] Settings loaded from NVS");
   Serial.printf("  Device: %s\n", _device_name);
   Serial.printf("  AP: %s / %s\n", _ap_ssid, _ap_password);
-  for (int i = 0; i < 4; i++) {
-    Serial.printf("  CH%d: %s\n", i + 1, _channel_names[i]);
-  }
   Serial.printf("  Sample interval: %lu ms\n", _sample_interval_ms);
   Serial.printf("  Temp unit: %c\n", _temp_unit);
 }
@@ -109,7 +106,7 @@ void DeviceSettings::save() {
   for (int i = 0; i < 4; i++) {
     char key[8];
     snprintf(key, sizeof(key), "ch%d_name", i);
-    prefs.putString(key, _channel_names[i]);
+    prefs.remove(key);  // clean up legacy channel names
   }
 
   prefs.putUInt("sample_ms", _sample_interval_ms);
@@ -118,10 +115,10 @@ void DeviceSettings::save() {
   prefs.putUShort("rotation", _rotation);
   prefs.putFloat("amb_toff", _amb_temp_offset);
 
-  prefs.end();
+  // Stop conditions: single blob key
+  prefs.putBytes("stop_cond", _stop, sizeof(_stop));
 
-  // Stop conditions → LittleFS (NVS too small for 20 keys)
-  _saveStopConditions();
+  prefs.end();
 
   Serial.println("[SET] Settings saved to NVS");
 }
@@ -133,15 +130,10 @@ void DeviceSettings::setDeviceName(const char *name) {
   _device_name[sizeof(_device_name) - 1] = '\0';
 }
 
-void DeviceSettings::setChannelName(int ch, const char *name) {
-  if (ch < 0 || ch > 3) return;
-  strncpy(_channel_names[ch], name, sizeof(_channel_names[ch]) - 1);
-  _channel_names[ch][sizeof(_channel_names[ch]) - 1] = '\0';
-}
-
 const char *DeviceSettings::channelName(int ch) const {
+  static const char *names[4] = {"CH1", "CH2", "CH3", "CH4"};
   if (ch < 0 || ch > 3) return "CH?";
-  return _channel_names[ch];
+  return names[ch];
 }
 
 void DeviceSettings::setWiFi(const char *ssid, const char *password) {
@@ -198,48 +190,4 @@ void DeviceSettings::setStopArmed(int ch, bool armed_V, bool armed_mA) {
   _stop[ch].armed_mA = armed_mA;
 }
 
-// ── Stop conditions persist to LittleFS (NVS is too small for 20 keys) ──
-static const char *STOP_JSON_PATH = "/data/stop_cond.json";
 
-void DeviceSettings::_saveStopConditions() {
-  if (!LittleFS.begin(true)) return;
-  File f = LittleFS.open(STOP_JSON_PATH, FILE_WRITE);
-  if (!f) { Serial.println("[SET] stop_cond save: cannot open"); return; }
-  // Simple text format: en,v,mA,min,fall per line
-  for (int i = 0; i < 4; i++) {
-    f.printf("%d,%.2f,%.1f,%u,%d\n",
-             _stop[i].enabled ? 1 : 0,
-             _stop[i].voltage_threshold_V,
-             _stop[i].current_threshold_mA,
-             _stop[i].max_duration_min,
-             _stop[i].falling_edge ? 1 : 0);
-  }
-  f.close();
-  Serial.println("[SET] stop conditions saved to LittleFS");
-}
-
-void DeviceSettings::_loadStopConditions() {
-  if (!LittleFS.begin(true)) return;
-  if (!LittleFS.exists(STOP_JSON_PATH)) {
-    Serial.println("[SET] no stop_cond.json — using defaults (all enabled)");
-    return;
-  }
-  File f = LittleFS.open(STOP_JSON_PATH, FILE_READ);
-  if (!f) return;
-  for (int i = 0; i < 4; i++) {
-    String line = f.readStringUntil('\n');
-    if (line.length() < 3) continue;
-    int en, fall;
-    float v, mA;
-    uint16_t min_;
-    if (sscanf(line.c_str(), "%d,%f,%f,%u,%d", &en, &v, &mA, &min_, &fall) == 5) {
-      _stop[i].enabled = en != 0;
-      _stop[i].voltage_threshold_V = v;
-      _stop[i].current_threshold_mA = mA;
-      _stop[i].max_duration_min = min_;
-      _stop[i].falling_edge = fall != 0;
-    }
-  }
-  f.close();
-  Serial.println("[SET] stop conditions loaded from LittleFS");
-}

@@ -659,9 +659,8 @@ static void handleChannelRename(AsyncWebServerRequest *request) {
     return;
   }
 
-  auto &cfg = DeviceSettings::getInstance();
-  cfg.setChannelName(ch, name.c_str());
-  cfg.save();
+  // Channel names are fixed (CH1-CH4) — nothing to save
+  (void)ch; (void)name;
 
   JsonDocument doc;
   doc["ok"] = true;
