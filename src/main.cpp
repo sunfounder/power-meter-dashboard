@@ -86,18 +86,22 @@ static void printAPDiagnostics() {
 
 /* ──────────────── Setup ──────────────── */
 
+// Set by WiFi event callback (WiFi task context), handled in loop()
+volatile bool sta_dropped_flag = false;
+volatile uint8_t sta_drop_reason_flag = 0;
+
 void setup() {
   Serial.begin(115200);
   delay(2000);
   Serial.begin(115200);
   delay(1000);
 
-  // WiFi auto-reconnect: if STA drops, keep trying
+  // WiFi auto-reconnect: event callback must stay NON-BLOCKING
+  // (it runs in WiFi task context — no Serial/WebLog/LittleFS/API calls here)
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-      Serial.println("[WIFI] STA disconnected, reconnecting...");
-      WebLog::getInstance().log("WiFi dropped (reason=%d), reconnecting", info.wifi_sta_disconnected.reason);
-      WiFi.reconnect();
+      sta_dropped_flag = true;
+      sta_drop_reason_flag = info.wifi_sta_disconnected.reason;
     }
   });
 
@@ -179,6 +183,14 @@ void loop() {
   MeasurementEngine::getInstance().update();
   buzzer.update();
   PowerMeterWebServer::getInstance().update();
+
+  // WiFi drop handled in loop() context (safe for logs/API)
+  if (sta_dropped_flag) {
+    sta_dropped_flag = false;
+    Serial.printf("[WIFI] STA dropped (reason=%u), reconnecting\n", sta_drop_reason_flag);
+    WebLog::getInstance().log("WiFi dropped (reason=%u)", sta_drop_reason_flag);
+    WiFi.reconnect();
+  }
 
   // Heap monitor: log every 60s to catch leaks
   static uint32_t last_heap_log = 0;
