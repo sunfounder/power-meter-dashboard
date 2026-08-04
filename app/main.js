@@ -58,27 +58,26 @@ ipcMain.handle('save-log', async () => {
 ipcMain.handle('get-log-path', () => '');
 ipcMain.handle('open-external', (e, url) => { shell.openExternal(url); return true; });
 
-// ── Update: download zip → extract → updater.bat → restart ──
+// ── Update: background download → apply (extract+swap+restart) ──
 const https = require('https');
 const { spawn, exec } = require('child_process');
 
-ipcMain.handle('do-update', async (e, url) => {
+const UPD_DIR = () => path.join(app.getPath('temp'), 'pm_update');
+const progress = (pct, status) => { try { mainWindow.webContents.send('update-progress', { pct, status }); } catch (_) {} };
+
+// Phase 1: download zip in background (button shows progress, no overlay)
+ipcMain.handle('download-update', async (e, url) => {
   if (!app.isPackaged) return { ok: false, error: 'dev mode' };
-  const installDir = path.dirname(process.execPath);
-  const workDir = path.join(app.getPath('temp'), 'pm_update');
+  const workDir = UPD_DIR();
   try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
   fs.mkdirSync(workDir, { recursive: true });
   const zipPath = path.join(workDir, 'update.zip');
-  const staging = path.join(workDir, 'staging');
-  const progress = (pct, status) => { try { mainWindow.webContents.send('update-progress', { pct, status }); } catch (_) {} };
-
   try {
-    // 1. download (follow redirects — GitHub download URLs 302 to objects.githubusercontent.com)
-    const download = (url, dest) => new Promise((resolve, reject) => {
-      const req = https.get(url, res => {
+    const download = (u, dest) => new Promise((resolve, reject) => {
+      const req = https.get(u, res => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          download(new URL(res.headers.location, url).href, dest).then(resolve).catch(reject);
+          download(new URL(res.headers.location, u).href, dest).then(resolve).catch(reject);
           return;
         }
         if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
@@ -87,32 +86,46 @@ ipcMain.handle('do-update', async (e, url) => {
         const f = fs.createWriteStream(dest);
         res.on('data', chunk => {
           got += chunk.length;
-          if (total) progress(Math.round(got / total * 90), 'downloading');
+          if (total) progress(Math.min(99, Math.round(got / total * 100)), 'downloading');
         });
         res.pipe(f);
         res.on('end', () => { f.close(); resolve(); });
         f.on('error', reject);
       });
       req.on('error', reject);
-      req.setTimeout(180000, () => req.destroy(new Error('timeout')));
+      req.setTimeout(300000, () => req.destroy(new Error('timeout')));
     });
-    progress(5, 'downloading');
     await download(url, zipPath);
-    progress(92, 'extracting');
     log('[UPD] downloaded ' + Math.round(fs.statSync(zipPath).size / 1048576) + ' MB');
+    return { ok: true, size: fs.statSync(zipPath).size };
+  } catch (err) {
+    log('[UPD] download failed: ' + err.message);
+    return { ok: false, error: err.message };
+  }
+});
 
-    // 2. extract via PowerShell Expand-Archive (no extra deps)
+// Phase 2: apply already-downloaded zip (extract → updater.bat → restart)
+ipcMain.handle('apply-update', async () => {
+  if (!app.isPackaged) return { ok: false, error: 'dev mode' };
+  const installDir = path.dirname(process.execPath);
+  const workDir = UPD_DIR();
+  const zipPath = path.join(workDir, 'update.zip');
+  const staging = path.join(workDir, 'staging');
+  if (!fs.existsSync(zipPath)) return { ok: false, error: 'no downloaded update' };
+
+  try {
+    progress(1, 'extracting');
+    // extract via PowerShell Expand-Archive (no extra deps)
     const ps = `Expand-Archive -Path '${zipPath}' -DestinationPath '${staging}' -Force`;
     await new Promise((resolve, reject) => {
       exec(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, err => err ? reject(err) : resolve());
     });
-    progress(96, 'installing');
+    progress(50, 'installing');
 
-    // 3. locate win-unpacked dir inside staging
-    const sub = fs.readdirSync(staging).map(n => path.join(staging, n)).find(p => fs.statSync(p).isDirectory());
-    const src = sub || staging;
+    // locate files inside staging (zip has no win-unpacked layer anymore)
+    const src = staging;
 
-    // 4. updater.bat (lives in temp, not locked by target)
+    // updater.bat (lives in temp, not locked by target)
     const bat = path.join(workDir, 'updater.bat');
     const batContent = [
       '@echo off',
@@ -124,13 +137,12 @@ ipcMain.handle('do-update', async (e, url) => {
     ].join('\r\n');
     fs.writeFileSync(bat, batContent);
 
-    // 5. launch updater detached, then quit
-    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore' }).unref();
+    // launch updater detached, then quit
+    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
     setTimeout(() => app.quit(), 800);
     return { ok: true };
   } catch (err) {
-    log('[UPD] failed: ' + err.message);
-    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
+    log('[UPD] apply failed: ' + err.message);
     return { ok: false, error: err.message };
   }
 });
