@@ -451,17 +451,8 @@ function updateTables(){
   }
 }
 
-// Manual refresh: force reload of status, chart data and file list
-function refreshAll(){
-  toast('刷新中...');
-  poll();
-  loadFiles();
-  for(let i=0;i<4;i++){
-    const chIdx=i;
-    const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
-    setTimeout(tryLoad,300);
-  }
-}
+// Manual refresh: full page reload (reconnects via saved IP)
+function refreshAll(){ location.reload(); }
 
 function up(){
   if(!lastData)return;
