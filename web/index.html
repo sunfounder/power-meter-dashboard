@@ -366,14 +366,14 @@ function ic(i){
     dataZoom:[{type:'inside',start:0,end:100}],
     xAxis:{type:'value',min:0,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
-      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false}},
+      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},splitArea:{show:false}},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}},
       {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
-      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none'},
-      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none'},
-      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none'},
+      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
+      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
+      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
       {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
     ],animation:false});
 }
