@@ -91,6 +91,16 @@ void setup() {
   delay(2000);
   Serial.begin(115200);
   delay(1000);
+
+  // WiFi auto-reconnect: if STA drops, keep trying
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+      Serial.println("[WIFI] STA disconnected, reconnecting...");
+      WebLog::getInstance().log("WiFi dropped (reason=%d), reconnecting", info.wifi_sta_disconnected.reason);
+      WiFi.reconnect();
+    }
+  });
+
   Serial.println();
   Serial.println("========================================");
   Serial.printf("  %s v%s\n", PRODUCT_NAME, FIRMWARE_VERSION);
@@ -167,6 +177,16 @@ void loop() {
   MeasurementEngine::getInstance().update();
   buzzer.update();
   PowerMeterWebServer::getInstance().update();
+
+  // Heap monitor: log every 60s to catch leaks
+  static uint32_t last_heap_log = 0;
+  if (now - last_heap_log >= 60000) {
+    last_heap_log = now;
+    Serial.printf("[MEM] free=%u largest=%u DMA=%u\n",
+                  (unsigned)ESP.getFreeHeap(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA));
+  }
 
   if (now - last_web_broadcast >= 500) {
     last_web_broadcast = now;
