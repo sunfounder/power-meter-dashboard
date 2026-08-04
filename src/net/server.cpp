@@ -323,6 +323,11 @@ static void handleStatus(AsyncWebServerRequest *request) {
   doc["temp_unit"] = String(cfg.tempUnit());
   doc["scope_ch"] = me.fastChannel();
 
+  // Live WiFi status (updates on reconnect/IP change)
+  doc["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
+  doc["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("");
+  doc["wifi_ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("");
+
   JsonArray ch_arr = doc["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {
     JsonObject ch = ch_arr.add<JsonObject>();
