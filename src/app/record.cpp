@@ -16,6 +16,23 @@ DataRecorder::DataRecorder() {
   memset(_filenames, 0, sizeof(_filenames));
   memset(_states, 0, sizeof(_states));
   memset(_elapsed_buf, 0, sizeof(_elapsed_buf));
+  s_start_beep_pending = false;
+  s_stop_beep_pending = false;
+}
+
+// ── Beep flags (set in any task, consumed in loop) ──
+static volatile bool s_start_beep_pending = false;
+static volatile bool s_stop_beep_pending = false;
+
+bool DataRecorder::consumeStartBeep() {
+  bool v = s_start_beep_pending;
+  s_start_beep_pending = false;
+  return v;
+}
+bool DataRecorder::consumeStopBeep() {
+  bool v = s_stop_beep_pending;
+  s_stop_beep_pending = false;
+  return v;
 }
 
 bool DataRecorder::begin() {
@@ -125,6 +142,7 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
 
   _buf_head[ch] = 0;
   _buf_count[ch] = 0;
+  s_start_beep_pending = true;
   return true;
 }
 
@@ -149,9 +167,8 @@ void DataRecorder::stopChannel(int ch) {
     _states[ch].last_file[sizeof(_states[ch].last_file) - 1] = '\0';
     Serial.printf("[DR] CH%d stopped. %lu samples -> %s\n",
                   ch + 1, _states[ch].sample_count, _filenames[ch]);
-    // Long beep on stop
-    extern Buzzer g_buzzer;
-    g_buzzer.beep(2400, 400);
+    // Beep on stop — flag only; LEDC call happens in loop() context
+    s_stop_beep_pending = true;
   }
   _states[ch].active = false;
 }

@@ -36,6 +36,10 @@ public:
   bool isAnyRecording() const;
   // Rename the in-progress recording (display name + final filename)
   void renameCurrent(int ch, const char *newName);
+  // Beep flags: set in any task context, consumed in loop() (LEDC is not
+  // safe to call from AsyncTCP/WiFi task contexts)
+  bool consumeStartBeep();
+  bool consumeStopBeep();
 
   bool appendSample(const MeasurementSnapshot &snap);
   void stopAll();

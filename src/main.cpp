@@ -204,6 +204,11 @@ void loop() {
     WiFi.reconnect();
   }
 
+  // Beeps consumed in loop() context — LEDC is not safe from AsyncTCP tasks
+  auto &rec_beep = DataRecorder::getInstance();
+  if (rec_beep.consumeStartBeep()) g_buzzer.beep(2400, 150);   // record started: short beep
+  if (rec_beep.consumeStopBeep())  g_buzzer.beep(2400, 400);   // record stopped: long beep
+
   // Heap monitor: log every 60s to catch leaks
   static uint32_t last_heap_log = 0;
   if (now - last_heap_log >= 60000) {
