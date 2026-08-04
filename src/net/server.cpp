@@ -560,34 +560,40 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
   int ch = parseChannelFromUrl(request->url());
   if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
 
-  // Limit: only return the most recent N samples (default 600 = 10min @1Hz)
-  // Reading the whole .dat into JSON at once can OOM the AsyncTCP task.
-  int limit = 600;
-  if (request->hasParam("limit")) {
-    limit = request->getParam("limit")->value().toInt();
-  }
+  // Pagination: offset = sample index (0-based, across file + ring buffer)
+  int offset = 0, limit = 300;
+  if (request->hasParam("offset")) offset = request->getParam("offset")->value().toInt();
+  if (request->hasParam("limit"))  limit  = request->getParam("limit")->value().toInt();
+  if (offset < 0) offset = 0;
   if (limit < 1) limit = 1;
-  if (limit > 2000) limit = 2000;
+  if (limit > 500) limit = 500;
 
   auto &rec = DataRecorder::getInstance();
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
 
-  // 1. Read the TAIL of the .dat file (most recent flushed samples)
+  // Layout: [ file samples (n) ][ ring buffer samples (cnt) ]
   const char *fname = rec.currentFilename(ch);
+  int n = 0;
   if (fname && fname[0] && LittleFS.exists(fname)) {
     File f = LittleFS.open(fname);
+    if (f) { n = f.size() / sizeof(SampleBin); f.close(); }
+  }
+  uint16_t cnt = rec.bufferCount(ch);
+  int total = n + cnt;
+
+  // 1. File portion
+  if (offset < n) {
+    File f = LittleFS.open(fname);
     if (f) {
-      size_t sz = f.size();
-      int n = sz / sizeof(SampleBin);
-      int skip = n > limit ? n - limit : 0;
-      if (skip > 0) f.seek((size_t)skip * sizeof(SampleBin));
-      for (int i = skip; i < n; i++) {
+      f.seek((size_t)offset * sizeof(SampleBin));
+      int end = min(offset + limit, n);
+      for (int i = offset; i < end; i++) {
         SampleBin b;
         if (f.read((uint8_t *)&b, sizeof(SampleBin)) != sizeof(SampleBin)) break;
         JsonObject o = arr.add<JsonObject>();
         o["t"] = b.timestamp;
-        o["V"] = b.bus_voltage_V;   // plain doubles — no String temporaries
+        o["V"] = b.bus_voltage_V;
         o["A"] = b.current_A;
         o["W"] = b.power_W;
         o["C"] = b.channel_temp_C;
@@ -596,12 +602,12 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
     }
   }
 
-  // 2. Append buffered (not yet flushed) samples
+  // 2. Ring buffer portion (samples after the file part)
+  int bufStart = max(0, offset - n);
+  int bufEnd = min((int)cnt, bufStart + (limit - (int)arr.size()));
   uint16_t head = rec.bufferHead(ch);
-  uint16_t cnt  = rec.bufferCount(ch);
-  int start = (head - cnt + 60) % 60;
-  for (uint16_t i = 0; i < cnt; i++) {
-    int idx = (start + i) % 60;
+  for (int i = bufStart; i < bufEnd; i++) {
+    int idx = (head - cnt + i + 60) % 60;
     const SampleBin &b = rec.bufferData(ch)[idx];
     JsonObject o = arr.add<JsonObject>();
     o["t"] = b.timestamp;
