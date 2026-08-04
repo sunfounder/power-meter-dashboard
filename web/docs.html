@@ -16,8 +16,16 @@ th{background:#1a1a1a;color:#e27005}
 </style>
 </head>
 <body>
-<h1>Power Meter — REST API v0.2</h1>
+<h1>Power Meter — REST API v0.3</h1>
 <p>Base URL: <code>http://&lt;device-ip&gt;</code> | AP: <code>192.168.4.1</code> | STA: 路由器分配</p>
+
+<h2>电流方向约定</h2>
+<table>
+<tr><th>场景</th><th>电流/功率符号</th></tr>
+<tr><td><b>充电</b>（电流流入被测设备）</td><td><b>正</b>（<code>current_A &gt; 0</code>，<code>power_W &gt; 0</code>）</td></tr>
+<tr><td><b>供电/放电</b>（电流流出被测设备）</td><td><b>负</b>（<code>current_A &lt; 0</code>，<code>power_W &lt; 0</code>）</td></tr>
+</table>
+<p>电压始终为正值。功率 = 电压 × 电流（带符号）。图表中 0 线为灰色虚线，正负一目了然。</p>
 
 <h2>健康检查</h2>
 <table><tr><th>方法</th><th>路径</th><th>响应</th></tr>
@@ -43,6 +51,7 @@ th{background:#1a1a1a;color:#e27005}
 <tr><td>POST</td><td><code>/api/channel/{0-3}/record/start</code></td><td><code>name=test</code></td><td>开始录制（新建 .dat 文件）</td></tr>
 <tr><td>POST</td><td><code>/api/channel/{0-3}/record/stop</code></td><td>—</td><td>停止 + flush 缓冲区到 Flash</td></tr>
 <tr><td>GET</td><td><code>/api/channel/{0-3}/record/data</code></td><td>—</td><td>RAM 缓冲区数据（刷新恢复用）</td></tr>
+<tr><td>GET</td><td><code>/api/channel/{0-3}/record/all?offset=0&amp;limit=300</code></td><td>—</td><td>分页拉取完整录制数据（文件+缓冲区），每页最多 500 条</td></tr>
 </table>
 
 <h2>文件管理</h2>
@@ -71,8 +80,15 @@ struct SampleBin {
 <table>
 <tr><th>方法</th><th>路径</th><th>支持的参数</th></tr>
 <tr><td>GET</td><td><code>/api/settings</code></td><td>—</td></tr>
-<tr><td>POST</td><td><code>/api/settings</code></td><td><code>device_name</code>, <code>ap_password</code>, <code>wifi_ssid</code>, <code>wifi_password</code>, <code>tz_offset</code>, <code>temp_unit</code> (C/F)</td></tr>
+<tr><td>POST</td><td><code>/api/settings</code></td><td><code>device_name</code>, <code>ap_password</code>, <code>wifi_ssid</code>, <code>wifi_password</code>, <code>tz_offset</code>, <code>temp_unit</code> (C/F), <code>sample_interval_ms</code>, <code>amb_temp_offset</code></td></tr>
 </table>
+
+<h2>自动停止条件</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>参数</th></tr>
+<tr><td>POST</td><td><code>/api/settings</code></td><td><code>stop_ch</code> (0-3), <code>stop_en</code>, <code>stop_v</code> (V), <code>stop_mA</code>, <code>stop_min</code>, <code>stop_fall</code></td></tr>
+</table>
+<p>每通道可设置：电压阈值、电流阈值、最大时长、下降沿模式。条件需连续满足 10 个采样（10 秒）才触发停止，防止误判。</p>
 
 <h2>WiFi</h2>
 <table><tr><th>方法</th><th>路径</th><th>请求体</th></tr>
@@ -86,6 +102,6 @@ struct SampleBin {
 <tr><td>GET</td><td><code>/api/logs</code></td><td>设备运行日志</td></tr>
 </table>
 
-<p style="color:#555;font-size:11px;margin-top:16px">更新于 2024年7月 · power-meter-dashboard</p>
+<p style="color:#555;font-size:11px;margin-top:16px">更新于 2026年8月 · power-meter-dashboard</p>
 </body>
 </html>
