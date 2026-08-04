@@ -842,17 +842,26 @@ async function downloadCSV(i){
 
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
-  const d=await api('/api/channel/'+i+'/record/all?limit=600');
-  if(!d||!d.length)return;
+  // Paginated fetch: pull all samples in 300-sample pages (device can't
+  // serialize a whole .dat to JSON at once without OOM)
+  const PAGE=300;
+  let all=[];
+  let off=0;
+  for(;;){
+    const d=await api('/api/channel/'+i+'/record/all?offset='+off+'&limit='+PAGE);
+    if(!d||!d.length)break;
+    all=all.concat(d);
+    if(d.length<PAGE)break;
+    off+=PAGE;
+  }
+  if(!all.length)return;
   const c=charts[i];if(!c)return;
-  // Note: sampleCount keeps total from /api/status; chart shows last 600
-  sampleCount[i]=Math.max(sampleCount[i]||0,d.length);
-  dataStore[i]=d.map(p=>({t:'--',V:p.V,A:p.A,W:p.W,C:p.C}));
-  const base=Math.max(0,sampleCount[i]-d.length);
+  sampleCount[i]=Math.max(sampleCount[i]||0,all.length);
+  dataStore[i]=all.map(p=>({t:'--',V:p.V,A:p.A,W:p.W,C:p.C}));
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=d.map((p,j)=>[base+j,parseFloat(p[key])||0]);
+    const data=all.map((p,j)=>[j,parseFloat(p[key])||0]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
