@@ -54,9 +54,11 @@ Remove-Item $zip -Force -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $unpacked '*') -DestinationPath $zip -Force
 Write-Host "[4/5] $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
 
-# ── 5. GitHub Release ──
+# ── 5. GitHub Release（notes 用 UTF-8 文件，避免中文乱码）──
 Push-Location $root
 if ([string]::IsNullOrEmpty($Notes)) { $Notes = "v$ver 自动发布 ($(Get-Date -Format 'yyyy-MM-dd'))" }
-gh release create "v$ver" $zip --title "v$ver" --notes "## v$ver`n$Notes"
+$notesFile = Join-Path $env:TEMP "pm_notes_v$ver.md"
+[System.IO.File]::WriteAllText($notesFile, "## v$ver`n$Notes", [System.Text.UTF8Encoding]::new($false))
+gh release create "v$ver" $zip --title "v$ver" --notes-file $notesFile
 Pop-Location
 Write-Host "[5/5] Release v$ver created"
