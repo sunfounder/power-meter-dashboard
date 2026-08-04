@@ -1,0 +1,7 @@
+# Build artifacts
+dist/
+*.zip
+
+# Node
+node_modules/
+*.log
