@@ -381,6 +381,18 @@ function poll(){
     if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
     lastData=d;document.getElementById('connDot').className='conn-dot';
     if(d.temp_unit){tempUnit=d.temp_unit;}
+    // Live WiFi status: update settings box + follow IP drift after reconnect
+    if(d.wifi_ip){
+      const ipInput=document.getElementById('setIP');
+      if(ipInput)ipInput.value=d.wifi_ip;
+      if(!DEVICE.includes(d.wifi_ip)&&!d.wifi_ip.startsWith('0.')){
+        // Device got a new IP after reconnect — follow it
+        DEVICE='http://'+d.wifi_ip;
+        localStorage.setItem('pm_ip',d.wifi_ip);
+      }
+      const ssidInput=document.getElementById('setWifiSSID');
+      if(ssidInput&&d.wifi_ssid)ssidInput.value=d.wifi_ssid;
+    }
     // Highlight scope channel
     for(let i=0;i<4;i++){
       const cr=document.getElementById('cr'+i);
