@@ -117,6 +117,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="poll()" title="刷新"><i class="fa fa-rotate"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
@@ -399,14 +400,32 @@ function poll(){
       }
       // Device stopped recording (auto-stop or external) while APP thought it was recording
       if(!r.active && recState[i]===1){
-        recState[i]=0;
+        recState[i]=2;
         document.getElementById('cr'+i).classList.remove('recording');
+        document.getElementById('cr'+i).classList.add('stopped');
         const btn=document.getElementById('cb'+i);
-        btn.textContent='REC';btn.className='btn-rec go';
-        document.getElementById('ct'+i).textContent='';
-        document.getElementById('rn'+i).textContent=pfx[i];
-        toast('CH'+(i+1)+' 录制已停止（自动停止）');
+        btn.textContent='Reset';btn.className='btn-rec reset';
+        if(r.last_file){
+          recFiles[i]=r.last_file;
+          const fi=document.getElementById('fi'+i);
+          fi.innerHTML=' | '+r.last_file+
+            ' <a href="#" onclick="downloadCSV('+i+');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+            ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+        }
+        toast('CH'+(i+1)+' 录制已停止');
         loadFiles();
+      }
+      // Refresh while stopped: recover stopped state from device
+      if(!r.active && recState[i]===0 && r.last_file){
+        recState[i]=2;
+        document.getElementById('cr'+i).classList.add('stopped');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='Reset';btn.className='btn-rec reset';
+        recFiles[i]=r.last_file;
+        const fi=document.getElementById('fi'+i);
+        fi.innerHTML=' | '+r.last_file+
+          ' <a href="#" onclick="downloadCSV('+i+');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
+          ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
       }
     }
     up();uc();updateTables();
