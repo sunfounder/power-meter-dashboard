@@ -364,9 +364,9 @@ function ic(i){
     dataZoom:[{type:'inside',start:0,end:100}],
     xAxis:{type:'value',min:0,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
-      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},min:0},
-      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0},
-      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false},min:0}
+      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false}},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}},
+      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
       {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none'},
