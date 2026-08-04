@@ -1,4 +1,4 @@
-# 发版一条龙：同步 web→app → 升版本 → 打包 zip → 创建 GitHub Release
+﻿# 发版一条龙：同步 web→app → 升版本 → 打包 zip → 创建 GitHub Release
 # 用法: powershell -File scripts/release.ps1 1.2.3 "changelog 第一行" "changelog 第二行..."
 param(
   [Parameter(Mandatory=$true)][string]$Version,
