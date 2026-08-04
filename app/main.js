@@ -57,3 +57,64 @@ ipcMain.handle('save-log', async () => {
 });
 ipcMain.handle('get-log-path', () => '');
 ipcMain.handle('open-external', (e, url) => { shell.openExternal(url); return true; });
+
+// ── Update: download zip → extract → updater.bat → restart ──
+const https = require('https');
+const { spawn, exec } = require('child_process');
+
+ipcMain.handle('do-update', async (e, url) => {
+  if (!app.isPackaged) return { ok: false, error: 'dev mode' };
+  const installDir = path.dirname(process.execPath);
+  const workDir = path.join(app.getPath('temp'), 'pm_update');
+  try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
+  fs.mkdirSync(workDir, { recursive: true });
+  const zipPath = path.join(workDir, 'update.zip');
+  const staging = path.join(workDir, 'staging');
+
+  try {
+    // 1. download
+    await new Promise((resolve, reject) => {
+      const req = https.get(url, res => {
+        if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+        const f = fs.createWriteStream(zipPath);
+        res.pipe(f);
+        res.on('end', () => { f.close(); resolve(); });
+        f.on('error', reject);
+      });
+      req.on('error', reject);
+      req.setTimeout(120000, () => req.destroy(new Error('timeout')));
+    });
+    log('[UPD] downloaded ' + Math.round(fs.statSync(zipPath).size / 1048576) + ' MB');
+
+    // 2. extract via PowerShell Expand-Archive (no extra deps)
+    const ps = `Expand-Archive -Path '${zipPath}' -DestinationPath '${staging}' -Force`;
+    await new Promise((resolve, reject) => {
+      exec(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, err => err ? reject(err) : resolve());
+    });
+
+    // 3. locate win-unpacked dir inside staging
+    const sub = fs.readdirSync(staging).map(n => path.join(staging, n)).find(p => fs.statSync(p).isDirectory());
+    const src = sub || staging;
+
+    // 4. updater.bat (lives in temp, not locked by target)
+    const bat = path.join(workDir, 'updater.bat');
+    const batContent = [
+      '@echo off',
+      'timeout /t 3 /nobreak >nul',
+      `robocopy "${src}" "${installDir}" /E /R:5 /W:2 /NFL /NDL /NJH /NJS`,
+      `for %%f in ("${installDir}\\*.exe") do start "" "%%f"`,
+      `rmdir /s /q "${workDir}"`,
+      'del "%~f0"'
+    ].join('\r\n');
+    fs.writeFileSync(bat, batContent);
+
+    // 5. launch updater detached, then quit
+    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => app.quit(), 800);
+    return { ok: true };
+  } catch (err) {
+    log('[UPD] failed: ' + err.message);
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
+    return { ok: false, error: err.message };
+  }
+});
