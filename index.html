@@ -397,6 +397,17 @@ function poll(){
         const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
         setTimeout(tryLoad,500);
       }
+      // Device stopped recording (auto-stop or external) while APP thought it was recording
+      if(!r.active && recState[i]===1){
+        recState[i]=0;
+        document.getElementById('cr'+i).classList.remove('recording');
+        const btn=document.getElementById('cb'+i);
+        btn.textContent='REC';btn.className='btn-rec go';
+        document.getElementById('ct'+i).textContent='';
+        document.getElementById('rn'+i).textContent=pfx[i];
+        toast('CH'+(i+1)+' 录制已停止（自动停止）');
+        loadFiles();
+      }
     }
     up();uc();updateTables();
   });
