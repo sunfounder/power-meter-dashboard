@@ -254,6 +254,7 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
     r["active"]  = recorder.isChannelRecording(i);
     r["elapsed"] = recorder.elapsedStr(i);
     r["samples"] = recorder.channelState(i).sample_count;
+    r["last_file"] = recorder.channelState(i).last_file;
     r["name"]    = recorder.channelState(i).name;
   }
 
@@ -296,6 +297,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       r["active"]  = recorder.isChannelRecording(i);
       r["elapsed"] = recorder.elapsedStr(i);
       r["samples"] = recorder.channelState(i).sample_count;
+    r["last_file"] = recorder.channelState(i).last_file;
     }
     String json;
     serializeJson(doc, json);
@@ -340,6 +342,7 @@ static void handleStatus(AsyncWebServerRequest *request) {
     r["active"]  = recorder.isChannelRecording(i);
     r["elapsed"] = recorder.elapsedStr(i);
     r["samples"] = recorder.channelState(i).sample_count;
+    r["last_file"] = recorder.channelState(i).last_file;
     r["name"]    = recorder.channelState(i).name;
   }
 

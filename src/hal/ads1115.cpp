@@ -48,7 +48,17 @@ int16_t ADS1115::readChannel(uint8_t channel) {
 }
 
 float ADS1115::readVoltage(uint8_t channel) {
-  return readChannel(channel) * _voltage_LSB;
+  if (channel > 3) return 0;
+  int16_t raw = readChannel(channel);
+  // I2C read failure returns 0 — hold last good value to avoid
+  // false NTC open-circuit detection.
+  if (raw == 0 && _last_raw[channel] != 0) {
+    return _last_voltage[channel];
+  }
+  _last_raw[channel] = raw;
+  float v = raw * _voltage_LSB;
+  _last_voltage[channel] = v;
+  return v;
 }
 
 void ADS1115::readAllChannels(int16_t values[4]) {

@@ -235,20 +235,33 @@ void MeasurementEngine::checkAutoStop() {
     if (!sc.enabled) continue;
     uint32_t elapsed_s = (millis() - rec.channelState(ch).start_time) / 1000;
     if (sc.max_duration_min > 0 && elapsed_s >= sc.max_duration_min * 60UL) {
+      WebLog::getInstance().log("AUTO-STOP CH%d: max duration %d min", ch+1, sc.max_duration_min);
       rec.stopChannel(ch); continue;
     }
     auto &s = _snapshot.channels[ch];
     if (sc.voltage_threshold_V > 0) {
       if (sc.falling_edge) {
         if (!sc.armed_V && s.bus_voltage_V > sc.voltage_threshold_V * 1.2f) cfg.setStopArmed(ch, true, sc.armed_mA);
-        if (sc.armed_V && s.bus_voltage_V < sc.voltage_threshold_V) { rec.stopChannel(ch); continue; }
-      } else { if (s.bus_voltage_V < sc.voltage_threshold_V) { rec.stopChannel(ch); continue; } }
+        if (sc.armed_V && s.bus_voltage_V < sc.voltage_threshold_V) {
+          WebLog::getInstance().log("AUTO-STOP CH%d: V fell below %.2f", ch+1, sc.voltage_threshold_V);
+          rec.stopChannel(ch); continue;
+        }
+      } else { if (s.bus_voltage_V < sc.voltage_threshold_V) {
+          WebLog::getInstance().log("AUTO-STOP CH%d: V below %.2f (%.2f)", ch+1, sc.voltage_threshold_V, s.bus_voltage_V);
+          rec.stopChannel(ch); continue;
+      } }
     }
     if (sc.current_threshold_mA > 0) {
       if (sc.falling_edge) {
         if (!sc.armed_mA && s.current_mA > sc.current_threshold_mA * 1.2f) cfg.setStopArmed(ch, sc.armed_V, true);
-        if (sc.armed_mA && s.current_mA < sc.current_threshold_mA) { rec.stopChannel(ch); continue; }
-      } else { if (s.current_mA < sc.current_threshold_mA) { rec.stopChannel(ch); continue; } }
+        if (sc.armed_mA && s.current_mA < sc.current_threshold_mA) {
+          WebLog::getInstance().log("AUTO-STOP CH%d: mA fell below %.0f", ch+1, sc.current_threshold_mA);
+          rec.stopChannel(ch); continue;
+        }
+      } else { if (s.current_mA < sc.current_threshold_mA) {
+          WebLog::getInstance().log("AUTO-STOP CH%d: mA below %.0f (%.1f)", ch+1, sc.current_threshold_mA, s.current_mA);
+          rec.stopChannel(ch); continue;
+      } }
     }
   }
 }

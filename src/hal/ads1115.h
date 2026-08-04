@@ -61,6 +61,8 @@ private:
   Gain _gain;
   float _voltage_LSB;
   TwoWire *_wire;
+  int16_t _last_raw[4] = {0,0,0,0};
+  float _last_voltage[4] = {0,0,0,0};
 
   void writeRegister(uint8_t reg, uint16_t value);
   uint16_t readRegister(uint8_t reg);

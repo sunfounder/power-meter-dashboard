@@ -111,6 +111,7 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
   _states[ch].start_time = millis();
   _states[ch].active = true;
   _states[ch].sample_count = 0;
+  _states[ch].last_file[0] = '\0';
 
   _buf_head[ch] = 0;
   _buf_count[ch] = 0;
@@ -121,6 +122,8 @@ void DataRecorder::stopChannel(int ch) {
   if (ch < 0 || ch > 3) return;
   if (_states[ch].active) {
     _flushBuffer(ch);
+    strncpy(_states[ch].last_file, _filenames[ch], sizeof(_states[ch].last_file) - 1);
+    _states[ch].last_file[sizeof(_states[ch].last_file) - 1] = '\0';
     Serial.printf("[DR] CH%d stopped. %lu samples -> %s\n",
                   ch + 1, _states[ch].sample_count, _filenames[ch]);
   }
