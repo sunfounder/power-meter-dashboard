@@ -5,8 +5,11 @@ param(
   [Parameter(Mandatory=$false)][string]$Notes
 )
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
+$root = [System.IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
+# 所有路径一律基于 $root（绝对路径），避免相对路径/编码问题
+Set-Location $root
 $ver = $Version.TrimStart('v')
+Write-Host "[0/5] repo root: $root"
 
 # ── 0. 检查 gh 登录 ──
 gh auth status | Out-Null
@@ -45,14 +48,15 @@ $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 Push-Location (Join-Path $root 'app')
 npm run build | Out-Null
 Pop-Location
-$unpacked = Join-Path $root 'app\dist\win-unpacked'
-$dist = Join-Path $root 'dist'
+$unpacked = [System.IO.Path]::GetFullPath((Join-Path $root 'app\dist\win-unpacked'))
+$dist = [System.IO.Path]::GetFullPath((Join-Path $root 'dist'))
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
-$zip = Join-Path $dist "SunFounderPowerMeter_v${ver}_win64.zip"
+$zip = [System.IO.Path]::GetFullPath((Join-Path $dist "SunFounderPowerMeter_v${ver}_win64.zip"))
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
 # zip 内直接是文件（无 win-unpacked 目录层）
 Compress-Archive -Path (Join-Path $unpacked '*') -DestinationPath $zip -Force
-Write-Host "[4/5] $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
+if (-not (Test-Path $zip)) { Write-Error "zip 生成失败: $zip"; exit 1 }
+Write-Host "[4/5] ZIP: $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
 
 # ── 5. GitHub Release（notes 用 UTF-8 文件，避免中文乱码）──
 Push-Location $root
