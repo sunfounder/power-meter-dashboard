@@ -118,12 +118,26 @@ void MeasurementEngine::clearFastMode() {
 void MeasurementEngine::_sampleAll() {
   _snapshot.timestamp_ms = time(nullptr);  // real UTC seconds
 
+  static float last_temp[4] = {0,0,0,0};
+  static uint8_t bad_cnt[4] = {0,0,0,0};
   for (int i = 0; i < 4; i++) {
-    // Always read NTC (even if INA226 not connected)
-    float ntc_v = _ads1115.readVoltage(i);
-    _snapshot.channels[i].channel_temp_C = _ntc.voltageToTemp(ntc_v);
+    if (!_connected[i]) {
+      // Channel not detected at boot — no NTC reading needed
+      _snapshot.channels[i].channel_temp_C = -999.0f;
+      _snapshot.channels[i].connected = false;
+      continue;
+    }
 
-    if (!_connected[i]) continue;
+    // Read NTC with glitch filter (10 consecutive fails = real open)
+    float ntc_v = _ads1115.readVoltage(i);
+    float t = _ntc.voltageToTemp(ntc_v);
+    if (t < -100) {
+      if (++bad_cnt[i] < 10 && last_temp[i] > -100) t = last_temp[i];
+    } else {
+      bad_cnt[i] = 0;
+      last_temp[i] = t;
+    }
+    _snapshot.channels[i].channel_temp_C = t;
 
     auto m = _ina226[i].readAll();
     if (m.bus_voltage_V < 0.001f && m.current_mA < 0.01f) continue;
@@ -149,8 +163,15 @@ float MeasurementEngine::_readAmbientTemp() {
   float raw_avg = (float)sum / 16.0f;
   float voltage = raw_avg * 3.3f / 4095.0f;
   float temp = _ntc.voltageToTemp(voltage);
-  static int acnt=0;
-  if(++acnt%10==0) Serial.printf("[AMB] ADC=%.0f V=%.3f temp=%.1f\n", raw_avg, voltage, temp);
+  // Hold last good value on transient glitches (10 consecutive fails = real open)
+  static float last_amb = 0;
+  static uint8_t amb_bad = 0;
+  if (temp < -100) {
+    if (++amb_bad < 10 && last_amb > -100) temp = last_amb;
+  } else {
+    amb_bad = 0;
+    last_amb = temp;
+  }
   return temp + DeviceSettings::getInstance().ambTempOffset();
 }
 

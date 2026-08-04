@@ -56,6 +56,12 @@ public:
    */
   float resistanceToTemp(float resistance);
 
+  /**
+   * Debug helper: compute resistance from voltage (same as voltageToResistance,
+   * exposed for serial diagnostics).
+   */
+  float debugResistance(float voltage) { return voltageToResistance(voltage); }
+
 private:
   float _r_series;
   float _r_nominal;
