@@ -203,6 +203,7 @@ let recFiles=['','','',''];
 let recStart=[0,0,0,0];
 let sampleCount=[0,0,0,0]; // X axis: sample index, buffer+live aligned
 let serHidden=[[false,false,false,false],[false,false,false,false],[false,false,false,false],[false,false,false,false]];
+let clearedFile=[false,false,false,false]; // true after Reset: don't re-show stopped state
 let tempUnit='C';
 let stopCh=-1;
 const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
@@ -410,7 +411,7 @@ function poll(){
         if(r.last_file){
           recFiles[i]=r.last_file;
           const fi=document.getElementById('fi'+i);
-          fi.innerHTML=' | '+r.last_file.replace('.dat','')+
+          fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
             ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
             ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
@@ -418,14 +419,14 @@ function poll(){
         loadFiles();
       }
       // Refresh while stopped: recover stopped state from device
-      if(!r.active && recState[i]===0 && r.last_file){
+      if(!r.active && recState[i]===0 && r.last_file && !clearedFile[i]){
         recState[i]=2;
         document.getElementById('cr'+i).classList.add('stopped');
         const btn=document.getElementById('cb'+i);
         btn.textContent='Reset';btn.className='btn-rec reset';
         recFiles[i]=r.last_file;
         const fi=document.getElementById('fi'+i);
-        fi.innerHTML=' | '+r.last_file.replace('.dat','')+
+        fi.innerHTML=' | '+r.last_file.split('/').pop().replace('.dat','')+
           ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
           ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         // Load recorded data into chart
@@ -453,7 +454,8 @@ function updateTables(){
 function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
-  document.getElementById('ambTemp').textContent=convTemp(d.ambient_temp_C||0).toFixed(1)+' '+ut();
+  const amb=d.ambient_temp_C;
+  document.getElementById('ambTemp').textContent=(amb==null||amb<-100)?'---':convTemp(amb).toFixed(1)+' '+ut();
   if(d.timestamp){
     const dt=new Date(d.timestamp*1000);
     document.getElementById('pageTime').textContent=
@@ -520,7 +522,7 @@ function tr(i){
   const btn=document.getElementById('cb'+i);
 
   if(recState[i]===0){ // IDLE → START RECORDING
-    recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;
+    recState[i]=1;recStart[i]=Date.now();sampleCount[i]=0;clearedFile[i]=false;
     document.getElementById('cr'+i).classList.add('recording');
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='STOP';btn.className='btn-rec stop';
@@ -547,7 +549,7 @@ function tr(i){
           const latest=d[d.length-1]; // assume last file is ours
           recFiles[i]=latest.name||'';
           const fi=document.getElementById('fi'+i);
-          fi.innerHTML=' | '+recFiles[i].replace('.dat','')+
+          fi.innerHTML=' | '+recFiles[i].split('/').pop().replace('.dat','')+
             ' <a href="#" onclick="downloadCSVFile(\''+recFiles[i]+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
             ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
         }
@@ -558,6 +560,7 @@ function tr(i){
     recState[i]=0;
     document.getElementById('cr'+i).classList.remove('stopped');
     btn.textContent='REC';btn.className='btn-rec go';
+    clearedFile[i]=true;
     document.getElementById('ct'+i).textContent='00:00';
     document.getElementById('fi'+i).innerHTML='';
     document.getElementById('dts'+i).style.display='none';
