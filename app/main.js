@@ -70,6 +70,7 @@ ipcMain.handle('do-update', async (e, url) => {
   fs.mkdirSync(workDir, { recursive: true });
   const zipPath = path.join(workDir, 'update.zip');
   const staging = path.join(workDir, 'staging');
+  const progress = (pct, status) => { try { mainWindow.webContents.send('update-progress', { pct, status }); } catch (_) {} };
 
   try {
     // 1. download (follow redirects — GitHub download URLs 302 to objects.githubusercontent.com)
@@ -81,15 +82,23 @@ ipcMain.handle('do-update', async (e, url) => {
           return;
         }
         if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+        const total = parseInt(res.headers['content-length'] || '0', 10);
+        let got = 0;
         const f = fs.createWriteStream(dest);
+        res.on('data', chunk => {
+          got += chunk.length;
+          if (total) progress(Math.round(got / total * 90), 'downloading');
+        });
         res.pipe(f);
         res.on('end', () => { f.close(); resolve(); });
         f.on('error', reject);
       });
       req.on('error', reject);
-      req.setTimeout(120000, () => req.destroy(new Error('timeout')));
+      req.setTimeout(180000, () => req.destroy(new Error('timeout')));
     });
+    progress(5, 'downloading');
     await download(url, zipPath);
+    progress(92, 'extracting');
     log('[UPD] downloaded ' + Math.round(fs.statSync(zipPath).size / 1048576) + ' MB');
 
     // 2. extract via PowerShell Expand-Archive (no extra deps)
@@ -97,6 +106,7 @@ ipcMain.handle('do-update', async (e, url) => {
     await new Promise((resolve, reject) => {
       exec(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, err => err ? reject(err) : resolve());
     });
+    progress(96, 'installing');
 
     // 3. locate win-unpacked dir inside staging
     const sub = fs.readdirSync(staging).map(n => path.join(staging, n)).find(p => fs.statSync(p).isDirectory());

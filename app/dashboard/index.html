@@ -685,17 +685,20 @@ function checkUpdate(){
     const remoteVer=String(rel.tag_name).replace(/^v/,'');
     if(remoteVer!==DASH_VER){
       const zip=(rel.assets||[]).find(a=>a.name.endsWith('.zip'));
-      const msg='发现新版本 v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说明)')+'\n\n'+(zip?'点击确定下载新版本':'点击确定查看 Release');
-      if(confirm(msg)){
-        const url=zip?zip.browser_download_url:rel.html_url;
-        if(window.electron&&zip){
-          toast('正在下载更新...');
-          window.electron.doUpdate(url).then(r=>{
-            if(r&&r.ok)toast('下载完成，正在安装...');
-            else toast('更新失败: '+(r&&r.error||'未知错误'));
-          });
-        }else if(window.electron){window.electron.openExternal(url);}
-        else{window.open(url,'_blank');}
+      const txt='发现新版本 v'+remoteVer+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+(rel.body||'(无说明)');
+      if(window.electron&&zip){
+        // Electron: show progress overlay, auto download
+        if(!confirm(txt+'\n\n点击确定开始下载更新'))return;
+        document.getElementById('dlOverlay').classList.add('show');
+        document.getElementById('dlStatus').textContent='正在下载更新...';
+        document.getElementById('dlBar').style.width='5%';
+        document.getElementById('dlCloseBtn').style.display='none';
+        window.electron.doUpdate(zip.browser_download_url).then(r=>{
+          if(r&&r.ok){document.getElementById('dlStatus').textContent='更新完成，正在重启...';document.getElementById('dlBar').style.width='100%';}
+          else{document.getElementById('dlStatus').textContent='更新失败: '+(r&&r.error||'未知错误');document.getElementById('dlCloseBtn').style.display='block';}
+        });
+      }else{
+        if(confirm(txt+'\n\n点击确定打开下载页面'))window.open(zip?zip.browser_download_url:rel.html_url,'_blank');
       }
     }else toast('已是最新 v'+DASH_VER);
   }).catch(()=>toast('检查失败(需联网)'));
@@ -709,6 +712,15 @@ if('serviceWorker' in navigator){
 }
 if(window.electron){
   document.getElementById('btnSaveLog').style.display='block';
+  // Update progress → progress overlay
+  window.electron.onUpdateProgress(p=>{
+    const el=document.getElementById('dlOverlay');
+    el.classList.add('show');
+    const st={downloading:'正在下载更新...',extracting:'解压中...',installing:'正在安装...'}[p.status]||'更新中...';
+    document.getElementById('dlStatus').textContent=st+' '+p.pct+'%';
+    document.getElementById('dlBar').style.width=p.pct+'%';
+    document.getElementById('dlCloseBtn').style.display='none';
+  });
   const orig=api;api=function(p,o){
   const full=DEVICE+p;
   return orig(p,o).then(r=>{

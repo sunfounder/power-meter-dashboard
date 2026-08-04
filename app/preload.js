@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('electron', {
   max: () => ipcRenderer.send('max'),
   close: () => ipcRenderer.send('close'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
-  doUpdate: (url) => ipcRenderer.invoke('do-update', url)
+  doUpdate: (url) => ipcRenderer.invoke('do-update', url),
+  onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (e, p) => cb(p))
 });
