@@ -684,7 +684,7 @@ function checkUpdate(){
     if(remote.version!==DASH_VER){
       if(confirm('发现新版本 v'+remote.version+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+remote.changelog+'\n\n是否更新?')){
         if(window.electron){location.reload(true);}
-        else{caches.delete('power-meter-v1').then(()=>location.reload(true));}
+        else{caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).then(()=>location.reload(true));}
       }
     }else toast('已是最新 v'+DASH_VER);
   }).catch(()=>toast('检查失败'));
