@@ -72,11 +72,16 @@ ipcMain.handle('do-update', async (e, url) => {
   const staging = path.join(workDir, 'staging');
 
   try {
-    // 1. download
-    await new Promise((resolve, reject) => {
+    // 1. download (follow redirects — GitHub download URLs 302 to objects.githubusercontent.com)
+    const download = (url, dest) => new Promise((resolve, reject) => {
       const req = https.get(url, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          download(new URL(res.headers.location, url).href, dest).then(resolve).catch(reject);
+          return;
+        }
         if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
-        const f = fs.createWriteStream(zipPath);
+        const f = fs.createWriteStream(dest);
         res.pipe(f);
         res.on('end', () => { f.close(); resolve(); });
         f.on('error', reject);
@@ -84,6 +89,7 @@ ipcMain.handle('do-update', async (e, url) => {
       req.on('error', reject);
       req.setTimeout(120000, () => req.destroy(new Error('timeout')));
     });
+    await download(url, zipPath);
     log('[UPD] downloaded ' + Math.round(fs.statSync(zipPath).size / 1048576) + ' MB');
 
     // 2. extract via PowerShell Expand-Archive (no extra deps)
