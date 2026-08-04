@@ -119,7 +119,8 @@ INA226::Measurement INA226::readAll() {
   m.shunt_voltage_mV = shunt_mV;
   m.bus_voltage_V    = bus_V;
   // Current = Vshunt / Rshunt (bypass calibration for transparency)
-  m.current_mA = (shunt_mV / (_shunt_mohm / 1000.0f));
+  // Sign convention: reversed so that CHARGING reads positive, supplying negative
+  m.current_mA = -(shunt_mV / (_shunt_mohm / 1000.0f));
   m.power_mW   = bus_V * m.current_mA;
 
   return m;
