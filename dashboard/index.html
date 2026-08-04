@@ -117,7 +117,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
-    <button class="btn-icon" onclick="poll()" title="刷新"><i class="fa fa-rotate"></i></button>
+    <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
@@ -448,6 +448,18 @@ function updateTables(){
     ).join('');
     const s=tb.closest('.data-scroll');if(!s)continue;
     if(s.scrollHeight-s.scrollTop-s.clientHeight<20)s.scrollTop=s.scrollHeight;
+  }
+}
+
+// Manual refresh: force reload of status, chart data and file list
+function refreshAll(){
+  toast('刷新中...');
+  poll();
+  loadFiles();
+  for(let i=0;i<4;i++){
+    const chIdx=i;
+    const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+    setTimeout(tryLoad,300);
   }
 }
 
