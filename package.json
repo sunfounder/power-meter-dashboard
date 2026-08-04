@@ -9,7 +9,7 @@
   },
   "build": {
     "appId": "com.sunfounder.powermeter",
-    "productName": "SunFounder¹¦ÂÊ¼Æ",
+    "productName": "SunFounderPowerMeter",
     "files": [
       "main.js",
       "preload.js",
