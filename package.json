@@ -1,15 +1,15 @@
 {
   "name": "power-meter-desktop",
   "version": "1.2.0",
-  "description": "SunFounder 鍔熺巼璁℃闈㈠簲鐢?,
+  "description": "SunFounder 功率计桌面应用",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable"
+    "build": "electron-builder --win --dir"
   },
   "build": {
     "appId": "com.sunfounder.powermeter",
-    "productName": "SunFounder鍔熺巼璁?,
+    "productName": "SunFounder功率计",
     "files": [
       "main.js",
       "preload.js",
@@ -21,7 +21,7 @@
       "dashboard/version.json"
     ],
     "win": {
-      "target": "portable",
+      "target": "dir",
       "signAndEditExecutable": false
     }
   },
