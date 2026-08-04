@@ -428,6 +428,10 @@ function poll(){
         fi.innerHTML=' | '+r.last_file.replace('.dat','')+
           ' <a href="#" onclick="downloadCSVFile(\''+r.last_file+'\');return false" title="下载" style="color:var(--accent)"><i class="fa fa-download"></i></a>'+
           ' <button onclick="delRecFile('+i+')" title="删除" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:12px"><i class="fa fa-trash"></i></button>';
+        // Load recorded data into chart
+        const chIdx=i;
+        const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+        setTimeout(tryLoad,500);
       }
     }
     up();uc();updateTables();
