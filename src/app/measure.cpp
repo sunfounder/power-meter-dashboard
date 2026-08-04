@@ -4,6 +4,9 @@
 #include "../net/log.h"
 #include "../hal/pin_config.h"
 
+// Auto-stop: require N consecutive below-threshold samples (glitch filter)
+#define AUTO_STOP_SAMPLES 10
+
 MeasurementEngine &MeasurementEngine::getInstance() {
   static MeasurementEngine instance;
   return instance;
@@ -247,6 +250,8 @@ void MeasurementEngine::checkAlarms() {
 void MeasurementEngine::checkAutoStop() {
   auto &rec = DataRecorder::getInstance();
   auto &cfg = DeviceSettings::getInstance();
+  // Consecutive below-threshold samples before stopping (glitch filter)
+  static uint8_t below_cnt[4] = {0,0,0,0};
   for (int ch = 0; ch < 4; ch++) {
     if (!rec.isChannelRecording(ch)) continue;
     auto &sc = cfg.stopCond(ch);
@@ -257,29 +262,27 @@ void MeasurementEngine::checkAutoStop() {
       rec.stopChannel(ch); continue;
     }
     auto &s = _snapshot.channels[ch];
+    bool below = false;
     if (sc.voltage_threshold_V > 0) {
       if (sc.falling_edge) {
         if (!sc.armed_V && s.bus_voltage_V > sc.voltage_threshold_V * 1.2f) cfg.setStopArmed(ch, true, sc.armed_mA);
-        if (sc.armed_V && s.bus_voltage_V < sc.voltage_threshold_V) {
-          WebLog::getInstance().log("AUTO-STOP CH%d: V fell below %.2f", ch+1, sc.voltage_threshold_V);
-          rec.stopChannel(ch); continue;
-        }
-      } else { if (s.bus_voltage_V < sc.voltage_threshold_V) {
-          WebLog::getInstance().log("AUTO-STOP CH%d: V below %.2f (%.2f)", ch+1, sc.voltage_threshold_V, s.bus_voltage_V);
-          rec.stopChannel(ch); continue;
-      } }
+        if (sc.armed_V && s.bus_voltage_V < sc.voltage_threshold_V) below = true;
+      } else { if (s.bus_voltage_V < sc.voltage_threshold_V) below = true; }
     }
     if (sc.current_threshold_mA > 0) {
       if (sc.falling_edge) {
         if (!sc.armed_mA && s.current_mA > sc.current_threshold_mA * 1.2f) cfg.setStopArmed(ch, sc.armed_V, true);
-        if (sc.armed_mA && s.current_mA < sc.current_threshold_mA) {
-          WebLog::getInstance().log("AUTO-STOP CH%d: mA fell below %.0f", ch+1, sc.current_threshold_mA);
-          rec.stopChannel(ch); continue;
-        }
-      } else { if (s.current_mA < sc.current_threshold_mA) {
-          WebLog::getInstance().log("AUTO-STOP CH%d: mA below %.0f (%.1f)", ch+1, sc.current_threshold_mA, s.current_mA);
-          rec.stopChannel(ch); continue;
-      } }
+        if (sc.armed_mA && s.current_mA < sc.current_threshold_mA) below = true;
+      } else { if (s.current_mA < sc.current_threshold_mA) below = true; }
+    }
+    if (below) {
+      // Require N consecutive low samples before auto-stop
+      if (++below_cnt[ch] >= AUTO_STOP_SAMPLES) {
+        WebLog::getInstance().log("AUTO-STOP CH%d: condition held %d samples", ch+1, below_cnt[ch]);
+        rec.stopChannel(ch);
+      }
+    } else {
+      below_cnt[ch] = 0;
     }
   }
 }

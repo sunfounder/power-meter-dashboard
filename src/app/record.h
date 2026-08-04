@@ -34,6 +34,8 @@ public:
   void stopChannel(int ch);
   bool isChannelRecording(int ch) const;
   bool isAnyRecording() const;
+  // Rename the in-progress recording (display name + final filename)
+  void renameCurrent(int ch, const char *newName);
 
   bool appendSample(const MeasurementSnapshot &snap);
   void stopAll();
@@ -60,10 +62,12 @@ private:
   uint16_t _buf_count[4];
 
   char _filenames[4][64];
+  bool  _rename_pending[4] = {false, false, false, false};
   ChannelRecordingState _states[4];
   char _elapsed_buf[6];
 
   bool _openFile(int ch, const char *testName);
+  void _buildFilename(int ch, const char *testName, char *out, size_t out_sz);
   void _flushBuffer(int ch);
 
   static constexpr const char *DATA_DIR = "/data";

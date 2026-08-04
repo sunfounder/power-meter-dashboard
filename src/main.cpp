@@ -155,6 +155,10 @@ void setup() {
 
   // ── Step 3: Web server (WiFi already up from Step 1 — no restart) ──
   PowerMeterWebServer::getInstance().begin();
+  printAPDiagnostics();
+
+  // Startup beep: two short beeps
+  g_buzzer.beepN(2, 2400, 100, 100);
 }
 
 /* ──────────────── Loop ──────────────── */

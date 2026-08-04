@@ -1,6 +1,7 @@
 #include "record.h"
 #include "config.h"
 #include "../net/log.h"
+#include "../hal/buzzer.h"
 #include <time.h>
 
 DataRecorder &DataRecorder::getInstance() {
@@ -32,9 +33,7 @@ bool DataRecorder::begin() {
   return true;
 }
 
-bool DataRecorder::_openFile(int ch, const char *testName) {
-  if (ch < 0 || ch > 3) return false;
-
+void DataRecorder::_buildFilename(int ch, const char *testName, char *out, size_t out_sz) {
   char safe_name[32];
   int j = 0;
   for (int i = 0; testName[i] && j < 28; i++) {
@@ -57,8 +56,13 @@ bool DataRecorder::_openFile(int ch, const char *testName) {
   } else {
     snprintf(ts, sizeof(ts), "_%08lx", millis() & 0xFFFFFFFF);
   }
-  snprintf(_filenames[ch], sizeof(_filenames[ch]),
-           "%s/%s_ch%d%s.dat", DATA_DIR, safe_name, ch + 1, ts);
+  snprintf(out, out_sz, "%s/%s_ch%d%s.dat", DATA_DIR, safe_name, ch + 1, ts);
+}
+
+bool DataRecorder::_openFile(int ch, const char *testName) {
+  if (ch < 0 || ch > 3) return false;
+
+  _buildFilename(ch, testName, _filenames[ch], sizeof(_filenames[ch]));
 
   // Create empty .dat file (no header needed)
   if (!LittleFS.exists(_filenames[ch])) {
@@ -114,6 +118,10 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
   _states[ch].active = true;
   _states[ch].sample_count = 0;
   _states[ch].last_file[0] = '\0';
+  _rename_pending[ch] = false;
+
+  // Reset auto-stop armed state for a fresh session
+  DeviceSettings::getInstance().setStopArmed(ch, false, false);
 
   _buf_head[ch] = 0;
   _buf_count[ch] = 0;
@@ -123,13 +131,38 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
 void DataRecorder::stopChannel(int ch) {
   if (ch < 0 || ch > 3) return;
   if (_states[ch].active) {
+    // Rename pending? Move empty file to new name before flush
+    if (_rename_pending[ch]) {
+      char newname[64];
+      _buildFilename(ch, _states[ch].name, newname, sizeof(newname));
+      if (strcmp(newname, _filenames[ch]) != 0) {
+        LittleFS.remove(newname);
+        LittleFS.rename(_filenames[ch], newname);
+        strncpy(_filenames[ch], newname, sizeof(_filenames[ch]) - 1);
+      }
+      _rename_pending[ch] = false;
+    }
     _flushBuffer(ch);
-    strncpy(_states[ch].last_file, _filenames[ch], sizeof(_states[ch].last_file) - 1);
+    // Store bare filename (no /data/ prefix) for the web UI
+    const char *base = strrchr(_filenames[ch], '/');
+    strncpy(_states[ch].last_file, base ? base + 1 : _filenames[ch], sizeof(_states[ch].last_file) - 1);
     _states[ch].last_file[sizeof(_states[ch].last_file) - 1] = '\0';
     Serial.printf("[DR] CH%d stopped. %lu samples -> %s\n",
                   ch + 1, _states[ch].sample_count, _filenames[ch]);
+    // Long beep on stop
+    extern Buzzer g_buzzer;
+    g_buzzer.beep(2400, 400);
   }
   _states[ch].active = false;
+}
+
+void DataRecorder::renameCurrent(int ch, const char *newName) {
+  if (ch < 0 || ch > 3) return;
+  if (!_states[ch].active) return;
+  strncpy(_states[ch].name, newName, sizeof(_states[ch].name) - 1);
+  _states[ch].name[sizeof(_states[ch].name) - 1] = '\0';
+  _rename_pending[ch] = true;
+  Serial.printf("[DR] CH%d renamed to: %s\n", ch + 1, _states[ch].name);
 }
 
 bool DataRecorder::isChannelRecording(int ch) const {

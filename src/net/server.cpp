@@ -198,8 +198,8 @@ void PowerMeterWebServer::startSTA(const char *ssid, const char *password) {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    // Sync NTP time (UTC+8 for China)
-    configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    // Sync NTP time (use configured tz offset)
+    configTime(DeviceSettings::getInstance().tzOffset() * 3600, 0, "pool.ntp.org", "time.nist.gov");
     Serial.println("[WS] NTP time sync started");
     WebLog::getInstance().log("STA connected: %s IP=%s", ssid, WiFi.localIP().toString().c_str());
 
@@ -529,9 +529,18 @@ static void handleChannelRecordStart(AsyncWebServerRequest *request) {
   }
   Serial.printf("[REC] name=%s\n", name.c_str());
   Serial.printf("[REC] LittleFS free=%d\n", LittleFS.totalBytes()-LittleFS.usedBytes());
-  Serial.println("[REC] calling startChannel...");
-  bool ok = DataRecorder::getInstance().startChannel(ch, name.c_str());
-  Serial.printf("[REC] startChannel returned %d\n", ok);
+  auto &rec = DataRecorder::getInstance();
+  bool ok;
+  if (rec.isChannelRecording(ch)) {
+    // Already recording — rename the in-progress session
+    rec.renameCurrent(ch, name.c_str());
+    ok = true;
+    Serial.println("[REC] renamed in-progress recording");
+  } else {
+    Serial.println("[REC] calling startChannel...");
+    ok = rec.startChannel(ch, name.c_str());
+    Serial.printf("[REC] startChannel returned %d\n", ok);
+  }
   JsonDocument doc;
   doc["ok"] = ok;
   doc["channel"] = ch;
@@ -801,7 +810,7 @@ static void handleWifiConfig(AsyncWebServerRequest *request) {
 
   JsonDocument doc;
   if (WiFi.status() == WL_CONNECTED) {
-    configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    configTime(DeviceSettings::getInstance().tzOffset() * 3600, 0, "pool.ntp.org", "time.nist.gov");
     doc["ok"] = true;
     doc["ip"] = WiFi.localIP().toString();
     doc["message"] = "Connected";
