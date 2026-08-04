@@ -141,7 +141,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <button class="btn-buzz" onclick="checkUpdate()" style="width:100%;margin-top:4px">检查更新</button>
     <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
-    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v1.2</div>
+    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v'+DASH_VER+'</div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
@@ -193,6 +193,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </div>
 
 <script>
+const DASH_VER='1.2.0'; // bump with each release
 let DEVICE='',pollTimer=null;
 const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
 const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
@@ -680,13 +681,12 @@ function checkUpdate(){
   toast('正在检查更新...');
   fetch('https://sunfounder.github.io/power-meter-dashboard/version.json?t='+Date.now())
   .then(r=>r.json()).then(remote=>{
-    const localVer='1.1.0';
-    if(remote.version!==localVer){
-      if(confirm('发现新版本 v'+remote.version+'\n\n'+remote.changelog+'\n\n是否更新?')){
+    if(remote.version!==DASH_VER){
+      if(confirm('发现新版本 v'+remote.version+' (当前 v'+DASH_VER+')\n\n更新内容:\n'+remote.changelog+'\n\n是否更新?')){
         if(window.electron){location.reload(true);}
         else{caches.delete('power-meter-v1').then(()=>location.reload(true));}
       }
-    }else toast('已是最新 v'+localVer);
+    }else toast('已是最新 v'+DASH_VER);
   }).catch(()=>toast('检查失败'));
 }
 if('serviceWorker' in navigator){
