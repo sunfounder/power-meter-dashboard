@@ -9,6 +9,10 @@ DataRecorder &DataRecorder::getInstance() {
   return instance;
 }
 
+// ── Beep flags (set in any task, consumed in loop) ──
+static volatile bool s_start_beep_pending = false;
+static volatile bool s_stop_beep_pending = false;
+
 DataRecorder::DataRecorder() {
   memset(_ring_buf, 0, sizeof(_ring_buf));
   memset(_buf_head, 0, sizeof(_buf_head));
@@ -19,10 +23,6 @@ DataRecorder::DataRecorder() {
   s_start_beep_pending = false;
   s_stop_beep_pending = false;
 }
-
-// ── Beep flags (set in any task, consumed in loop) ──
-static volatile bool s_start_beep_pending = false;
-static volatile bool s_stop_beep_pending = false;
 
 bool DataRecorder::consumeStartBeep() {
   bool v = s_start_beep_pending;
