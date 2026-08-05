@@ -32,6 +32,9 @@ public:
   // Broadcast latest measurement to WebSocket clients
   void broadcastData(const struct MeasurementSnapshot &snap);
 
+  // Streaming history: push .dat samples as binary chunks (called from main loop)
+  void streamTick();
+
   // Notification
   void notifyAlarm(int channel, const char *message);
 

@@ -249,6 +249,67 @@ static void channelToJson(JsonObject ch, const ChannelSample &c) {
 // broadcast pauses for a while so the response isn't stuck behind 1s broadcasts.
 volatile uint32_t ws_send_busy_until = 0;
 
+// ── History streaming state machine ──
+// stream_start → main loop pushes binary chunks (SampleBin[]), then stream_done.
+static int  s_stream_ch = -1;        // active channel, -1 = idle
+static int  s_stream_client = -1;    // requesting client id
+static File s_stream_file;           // open .dat (invalid when file part done)
+static uint32_t s_stream_off = 0;    // next sample index to send
+static uint32_t s_stream_n_file = 0; // samples in file part
+static uint32_t s_stream_total = 0;  // total samples (file + ring buffer)
+static uint32_t s_stream_last = 0;   // last tick ms
+
+void PowerMeterWebServer::streamTick() {
+  if (s_stream_ch < 0) return;
+  uint32_t now = millis();
+  if (now - s_stream_last < 20) return;  // throttle ~50 chunks/s
+  s_stream_last = now;
+
+  auto &rec = DataRecorder::getInstance();
+
+  SampleBin chunk[50];  // 50 × 24B = 1200B per frame
+  size_t n = 0;
+
+  // 1. File portion
+  if (s_stream_off < s_stream_n_file) {
+    size_t want = min((size_t)50, (size_t)(s_stream_n_file - s_stream_off));
+    size_t got = s_stream_file.read((uint8_t *)chunk, want * sizeof(SampleBin));
+    n = got / sizeof(SampleBin);
+    s_stream_off += n;
+    if (s_stream_off >= s_stream_n_file) s_stream_file.close();
+  } else {
+    // 2. Ring buffer portion (recording continues — samples after file part)
+    uint16_t cnt = rec.bufferCount(s_stream_ch);
+    uint32_t bufStart = s_stream_off - s_stream_n_file;
+    if (bufStart < cnt) {
+      uint16_t head = rec.bufferHead(s_stream_ch);
+      size_t want = min((size_t)50, (size_t)(cnt - bufStart));
+      for (size_t k = 0; k < want; k++) {
+        int idx = (head - cnt + bufStart + k + 60) % 60;
+        chunk[n++] = rec.bufferData(s_stream_ch)[idx];
+      }
+      s_stream_off += want;
+    }
+  }
+
+  if (n > 0) {
+    _ws.getClient(s_stream_client)->binary((uint8_t *)chunk, n * sizeof(SampleBin));
+    return;
+  }
+
+  // Done
+  JsonDocument done;
+  done["type"] = "stream_done";
+  done["ch"] = s_stream_ch;
+  done["total"] = s_stream_total;
+  String j;
+  serializeJson(done, j);
+  _ws.getClient(s_stream_client)->text(j);
+  ws_send_busy_until = 0;  // resume broadcasts
+  s_stream_ch = -1;
+  Serial.printf("[STREAM] ch%d done, %u samples\n", s_stream_ch, s_stream_total);
+}
+
 void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   if (!_running) return;
   if (millis() < ws_send_busy_until) return;  // paused: large response in flight
@@ -420,6 +481,33 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       client->text(ok ? "{\"type\":\"dl_done\"}"
                       : "{\"type\":\"dl_fail\",\"error\":\"file not found\"}");
       return;
+    } else if (cmd == "stream_start") {
+      int ch = doc["ch"] | -1;
+      if (ch < 0 || ch > 3) { ack["ok"] = false; }
+      else {
+        auto &rec = DataRecorder::getInstance();
+        const char *fname = rec.currentFilename(ch);
+        bool ok = false;
+        if (fname && fname[0] && LittleFS.exists(fname)) {
+          s_stream_file = LittleFS.open(fname);
+          if (s_stream_file) {
+            s_stream_ch = ch;
+            s_stream_client = client->id();
+            s_stream_off = 0;
+            s_stream_n_file = s_stream_file.size() / sizeof(SampleBin);
+            s_stream_total = s_stream_n_file + rec.bufferCount(ch);
+            s_stream_last = 0;  // force first chunk immediately
+            ws_send_busy_until = millis() + 2000;  // quiet start
+            ok = true;
+          }
+        }
+        if (!ok) {
+          s_stream_ch = -1;
+          if (s_stream_file) s_stream_file.close();
+        }
+        ack["ok"] = ok;
+        ack["total"] = ok ? s_stream_total : 0;
+      }
     } else if (cmd == "settings") {
       // Same params as POST /api/settings
       auto &cfg = DeviceSettings::getInstance();

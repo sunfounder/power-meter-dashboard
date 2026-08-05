@@ -230,6 +230,9 @@ void loop() {
         MeasurementEngine::getInstance().getLatest());
   }
 
+  // Push history stream chunks (throttled internally to ~50/s)
+  PowerMeterWebServer::getInstance().streamTick();
+
   checkAlarms();
 
   // NTP retry: if STA connected but time not synced, retry every 30s

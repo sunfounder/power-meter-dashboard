@@ -281,8 +281,9 @@ function connectWS(ip){
   };
   ws.onmessage=e=>{
     if(e.data instanceof ArrayBuffer){
-      // Binary frame: .dat download chunk
-      if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
+      // Binary frame: history stream chunk or .dat download chunk
+      if(streamActive){console.log('[STREAM] +'+e.data.byteLength+'B');streamChunks.push(new Uint8Array(e.data));}
+      else if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
       return;
     }
     let msg;try{msg=JSON.parse(e.data);}catch(_){console.log('[WS] BAD JSON frame len='+e.data.length+' head='+String(e.data).slice(0,80));return;}
@@ -292,7 +293,9 @@ function connectWS(ip){
       console.log('[WS] m ch='+chs.map(c=>c&&c.connected?'1':'0').join('')+' rec='+rec);
     }
     else if(msg.type==='ack')console.log('[WS] ack',msg.cmd,msg.ok);
+    else if(msg.type==='stream_done')console.log('[STREAM] done total='+msg.total);
     else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
+    if(msg.type==='stream_done'){window.dispatchEvent(new Event('stream-done'));return;}
     if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
     if(msg.type==='dl_fail'){window.dispatchEvent(new CustomEvent('dl-fail',{detail:msg.error}));return;}
     if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
@@ -1005,6 +1008,8 @@ if(window.electron){
 
 // ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
+// History stream state (binary chunks from device until stream_done)
+let streamActive=false, streamChunks=[];
 let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
   if(dlActive){toast('已有下载进行中');return;}
