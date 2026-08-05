@@ -128,6 +128,8 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
 
   // Enforce max recorded files: delete oldest .dat before starting a new one
   _enforceFileLimit();
+  // Ensure free space for 8h at current sample rate (delete oldest if needed)
+  _ensureSpaceFor8h();
 
   if (!_openFile(ch, testName)) return false;
 
@@ -233,7 +235,7 @@ const char *DataRecorder::elapsedStr(int ch) {
 }
 
 void DataRecorder::listFiles() {
-  File root = LittleFS.open(DATA_DIR);
+  File root = LittleFS.open("/data");
   if (!root || !root.isDirectory()) { Serial.println("[DR] No data directory"); return; }
   Serial.println("[DR] Recorded files:");
   File f = root.openNextFile();
@@ -258,17 +260,13 @@ bool DataRecorder::deleteFile(const char *path) {
   return LittleFS.remove(path);
 }
 
-// Keep at most MAX_REC_FILES .dat files: delete the oldest by name
-// (names embed YYYYMMDD_HHMMSS timestamps, so lexical order ≈ time order).
-void DataRecorder::_enforceFileLimit() {
-  File root = LittleFS.open(DATA_DIR);
-  if (!root || !root.isDirectory()) return;
-
-  const int MAX = 32;
-  char names[MAX][64];
+// Collect .dat filenames into names[] (heap-free, fixed size). Returns count.
+static int collectDatFiles(char names[][64], int max) {
+  File root = LittleFS.open("/data");
+  if (!root || !root.isDirectory()) return 0;
   int n = 0;
   File f;
-  while ((f = root.openNextFile()) && n < MAX) {
+  while ((f = root.openNextFile()) && n < max) {
     String nm = String(f.name());
     f.close();
     if (nm.endsWith(".dat")) {
@@ -278,9 +276,34 @@ void DataRecorder::_enforceFileLimit() {
     }
   }
   root.close();
+  return n;
+}
 
+// Delete the lexicographically smallest (= oldest by embedded timestamp) .dat.
+// Returns true if one was removed.
+static bool deleteOldestDat() {
+  const int MAX = 32;
+  char names[MAX][64];
+  int n = collectDatFiles(names, MAX);
+  if (n == 0) return false;
+  int min_i = 0;
+  for (int i = 1; i < n; i++) {
+    if (strcmp(names[i], names[min_i]) < 0) min_i = i;
+  }
+  if (LittleFS.remove(names[min_i])) {
+    Serial.printf("[DR] removed oldest %s\n", names[min_i]);
+    return true;
+  }
+  return false;
+}
+
+// Keep at most MAX_REC_FILES .dat files: delete the oldest by name
+// (names embed YYYYMMDD_HHMMSS timestamps, so lexical order ≈ time order).
+void DataRecorder::_enforceFileLimit() {
+  const int MAX = 32;
+  char names[MAX][64];
+  int n = collectDatFiles(names, MAX);
   while (n > MAX_REC_FILES) {
-    // find lexicographically smallest (= oldest)
     int min_i = 0;
     for (int i = 1; i < n; i++) {
       if (strcmp(names[i], names[min_i]) < 0) min_i = i;
@@ -288,8 +311,26 @@ void DataRecorder::_enforceFileLimit() {
     if (LittleFS.remove(names[min_i])) {
       Serial.printf("[DR] file limit: removed oldest %s\n", names[min_i]);
     }
-    // shift
     for (int i = min_i; i < n - 1; i++) strcpy(names[i], names[i + 1]);
     n--;
+  }
+}
+
+// Ensure enough free space for 8 hours of recording at the current sample rate.
+// Deletes oldest recordings until satisfied (or nothing left to delete).
+void DataRecorder::_ensureSpaceFor8h() {
+  uint32_t interval = DeviceSettings::getInstance().sampleIntervalMs();
+  if (interval == 0) interval = 1000;
+  size_t need = (8UL * 3600 * 1000 / interval) * sizeof(SampleBin);
+  int guard = 0;
+  while (LittleFS.usedBytes() + need > LittleFS.totalBytes() && guard < 32) {
+    if (!deleteOldestDat()) break;
+    guard++;
+  }
+  size_t free = LittleFS.totalBytes() - LittleFS.usedBytes();
+  if (free < need) {
+    Serial.printf("[DR] WARN: 8h @%lums needs %uKB but only %uKB free (max ~%.1fh)\n",
+                  interval, (unsigned)(need / 1024), (unsigned)(free / 1024),
+                  (double)free / need * 8.0);
   }
 }
