@@ -57,8 +57,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 .rec-btns{display:flex;gap:4px;flex:1}
 .rec-btns .btn-rec{flex:1}
 .ch-chart-wrap{position:relative;flex:1;min-width:0;min-height:0;display:flex}
-.chart-loading{position:absolute;inset:0;background:rgba(0,0,0,0.15);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:8px;z-index:5}
-.load-txt{font-size:10px;color:var(--dim)}
+.chart-loading{position:absolute;inset:0;background:rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:5}
 .spinner{width:22px;height:22px;border:3px solid rgba(128,128,128,0.35);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* switch-style checkbox */
@@ -249,7 +248,7 @@ function setDevice(ip){
   for(let i=0;i<4;i++){if(charts[i]){charts[i].dispose();charts[i]=null;}}
   build();
   if(pollTimer)clearInterval(pollTimer);
-  poll();pollTimer=setInterval(poll,1000);
+  poll();pollTimer=setInterval(poll,2000);
   // Fetch firmware version once
   api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
 }
@@ -332,7 +331,7 @@ function build(){
       '</div>'+
       '<button class="btn-log" onclick="td('+i+')" id="cl'+i+'"><i class="fa fa-caret-down lg-arrow"></i><span class="lg-txt">详细数据</span></button>'+
       '</div></div>'+
-      '<div class="ch-chart-wrap" id="cw'+i+'"><div class="ch-chart-box" id="cx'+i+'"></div><div class="chart-loading" id="cload'+i+'" style="display:none"><div class="spinner"></div><div class="load-txt" id="cltxt'+i+'"></div></div></div>'+
+      '<div class="ch-chart-wrap" id="cw'+i+'"><div class="ch-chart-box" id="cx'+i+'"></div><div class="chart-loading" id="cload'+i+'" style="display:none"><div class="spinner"></div></div></div>'+
       '</div>'+
       '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>';
       '<div class="data-scroll" id="dts'+i+'"><table class="data-table"><thead><tr><th>#</th><th>Time</th><th>V</th><th>A</th><th>W</th><th>C</th></tr></thead><tbody id="dtb'+i+'"></tbody></table></div>';
@@ -493,7 +492,6 @@ function poll(){
       // Refresh while stopped: recover stopped state from device
       if(!r.active && recState[i]===0 && r.last_file && !clearedFile[i]){
         recState[i]=2;
-        sampleCount[i]=r.samples||0;  // total samples for progress
         document.getElementById('cr'+i).classList.add('stopped');
         recFiles[i]=r.last_file||'';
         setRecBtns(i,2);
@@ -908,7 +906,6 @@ function showJustUpdated() {
     }
   } catch (_) {}
 }
-// Service Worker only makes sense over http(s) — file:// (Electron) unsupported
 if('serviceWorker' in navigator && location.protocol==='http:'){
   navigator.serviceWorker.register('sw.js');
   navigator.serviceWorker.ready.then(()=>{
@@ -961,33 +958,17 @@ async function downloadCSVFile(fname){
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
   const ld=document.getElementById('cload'+i);
-  const ltxt=document.getElementById('cltxt'+i);
   if(ld)ld.style.display='flex';
-  if(ltxt)ltxt.textContent='';
-  // Pause live polling while pulling history (avoid competing with status)
-  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
   try{
   // Paginated fetch: pull all samples in 300-sample pages (device can't
   // serialize a whole .dat to JSON at once without OOM)
   const PAGE=300;
   let all=[];
   let off=0;
-  const total=sampleCount[i]||0;
   for(;;){
-    // Retry up to 3 times per page (WiFi can drop large responses)
-    let d=null;
-    for(let r=0;r<3&&!d;r++){
-      d=await api('/api/channel/'+i+'/record/all?offset='+off+'&limit='+PAGE);
-    }
-    if(!d||!d.length){
-      if(!all.length&&ltxt)ltxt.textContent='加载失败';
-      break;
-    }
+    const d=await api('/api/channel/'+i+'/record/all?offset='+off+'&limit='+PAGE);
+    if(!d||!d.length)break;
     all=all.concat(d);
-    if(ltxt){
-      const got=all.length, tot=total||got;
-      ltxt.textContent=Math.min(100,Math.round(got/tot*100))+'% ('+got+'/'+tot+')';
-    }
     if(d.length<PAGE)break;
     off+=PAGE;
   }
@@ -1006,8 +987,6 @@ async function loadBufferData(i){
   c.setOption(opts,{notMerge:false});
   }finally{
     if(ld)ld.style.display='none';
-    // Resume live polling
-    if(!pollTimer){poll();pollTimer=setInterval(poll,1000);}
   }
 }
 </script>

@@ -19,6 +19,10 @@
 extern lv_display_t *g_lv_disp; // from main.cpp, for live rotation
 
 static AsyncWebServer _server(80);
+
+// Guard against client storms: cap concurrent connections (prevents
+// AsyncTCP task saturation from many polling clients)
+static const int MAX_HTTP_CLIENTS = 4;
 static AsyncWebSocket _ws("/ws");
 
 static bool _running = false;
@@ -71,6 +75,7 @@ PowerMeterWebServer::PowerMeterWebServer() : _running(false), _ap_mode(true), _l
 bool PowerMeterWebServer::begin() {
   setupRoutes();
   setupWebSocket();
+  _server.setMaxClients(MAX_HTTP_CLIENTS);
   _server.begin();
   _running = true;
   Serial.println("[WS] Web server started on port 80");
