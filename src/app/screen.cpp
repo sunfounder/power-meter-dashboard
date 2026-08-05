@@ -145,7 +145,7 @@ static void refresh_card(int ch) {
     for (int j = 0; j < 4; j++) lv_obj_set_style_bg_color(_unit_labels[ch][j], badge_colors[j], 0);
     snprintf(buf, sizeof(buf), "%.2f", s.bus_voltage_V);
     lv_label_set_text(_val_labels[ch][0], buf);
-    snprintf(buf, sizeof(buf), "%.3f", s.current_mA / 1000.0f);
+    snprintf(buf, sizeof(buf), "%.2f", s.current_mA / 1000.0f);
     lv_label_set_text(_val_labels[ch][1], buf);
     snprintf(buf, sizeof(buf), "%.2f", s.power_mW / 1000.0f);
     lv_label_set_text(_val_labels[ch][2], buf);
@@ -333,7 +333,7 @@ static void scope_timer_cb(lv_timer_t *) {
     char buf[16];
     snprintf(buf, sizeof(buf), "%5.2f V", s.bus_voltage_V);
     lv_label_set_text(_scope_lbl_v, buf);
-    snprintf(buf, sizeof(buf), "%5.3f A", s.current_mA/1000.0f);
+    snprintf(buf, sizeof(buf), "%5.2f A", s.current_mA/1000.0f);
     lv_label_set_text(_scope_lbl_a, buf);
     snprintf(buf, sizeof(buf), "%5.2f W", s.power_mW/1000.0f);
     lv_label_set_text(_scope_lbl_w, buf);
