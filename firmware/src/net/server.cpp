@@ -120,7 +120,7 @@ void PowerMeterWebServer::update() {
 // NTP sync with China-friendly servers, using configured tz offset
 void ntpSync() {
   int8_t tz = DeviceSettings::getInstance().tzOffset();
-  ntpSync();
+  configTime(tz * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
 }
 
 void PowerMeterWebServer::startAP() {

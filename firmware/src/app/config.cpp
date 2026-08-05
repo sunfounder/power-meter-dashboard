@@ -71,9 +71,7 @@ void DeviceSettings::load() {
   _rotation  = prefs.getUShort("rotation", 0);
   _amb_temp_offset = prefs.getFloat("amb_toff", 0);
 
-  prefs.end();
-
-  // Stop conditions: stored in LittleFS (NVS too small for 20 keys)
+  // Stop conditions: single blob key (must read BEFORE prefs.end())
   size_t len = prefs.getBytes("stop_cond", _stop, sizeof(_stop));
   if (len == 0) {
     Serial.println("[SET] no stop_cond in NVS — using defaults (all enabled)");

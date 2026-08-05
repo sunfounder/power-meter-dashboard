@@ -253,7 +253,7 @@ void MeasurementEngine::checkAutoStop() {
   // Consecutive below-threshold samples before stopping (glitch filter)
   static uint8_t below_cnt[4] = {0,0,0,0};
   for (int ch = 0; ch < 4; ch++) {
-    if (!rec.isChannelRecording(ch)) continue;
+    if (!rec.isChannelRecording(ch)) { below_cnt[ch] = 0; continue; }
     auto &sc = cfg.stopCond(ch);
     // DIAG: log every 30th check while recording
     {
