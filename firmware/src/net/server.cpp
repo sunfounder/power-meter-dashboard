@@ -399,6 +399,27 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       delay(100);
       ESP.restart();
       return;
+    } else if (cmd == "download_start") {
+      String fname = doc["file"] | "";
+      bool ok = false;
+      if (fname.length() && fname.indexOf('/') < 0 && fname.indexOf('\\') < 0) {
+        String path = "/data/" + fname;
+        if (LittleFS.exists(path)) {
+          File f = LittleFS.open(path);
+          if (f) {
+            uint8_t buf[512];
+            size_t rd;
+            while ((rd = f.read(buf, sizeof(buf))) > 0) {
+              client->binary(buf, rd);
+            }
+            f.close();
+            ok = true;
+          }
+        }
+      }
+      client->text(ok ? "{\"type\":\"dl_done\"}"
+                      : "{\"type\":\"dl_fail\",\"error\":\"file not found\"}");
+      return;
     } else if (cmd == "settings") {
       // Same params as POST /api/settings
       auto &cfg = DeviceSettings::getInstance();

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
 <title>SunFounder 功率计</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="vendor/echarts.min.js"></script>
+<link rel="stylesheet" href="vendor/fontawesome.min.css">
 <style>
 :root{--bg:#080808;--card-bg:#141414;--border:#2a2a2a;--accent:#e27005;--text:#e0e0e0;--dim:#777;--red:#e04040;--green:#3cb84c;
 --panel:#111;--panel2:#0c0c0c;--inner:#0a0a0a;--inner-bd:#222;--inner-bd2:#333;--border2:#1a1a1a;--grid:#555;--mark:#888;--btnbg:#444;--off:#333;--stopbg:#444}
@@ -237,7 +237,7 @@ let stopCh=-1;
 const lastNZ=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],dataStore=[[],[],[],[]];
 const MAX_FILES=10;
 
-function api(p,o){return fetch(DEVICE+p,o).then(r=>r.json()).catch(()=>null)}
+// No HTTP calls to device — everything goes over WebSocket (see wsReq/wsSend)
 function getSavedIP(){return localStorage.getItem('pm_ip')||''}
 function saveIP(ip){localStorage.setItem('pm_ip',ip)}
 
@@ -256,9 +256,17 @@ let ws=null, wsTimer=null, wsRetry=0;
 function connectWS(ip){
   if(ws)try{ws.close();}catch(_){}
   ws=new WebSocket('ws://'+ip+'/ws');
+  ws.binaryType='arraybuffer';
   ws.onopen=()=>{document.getElementById('connDot').className='conn-dot';wsRetry=0;};
   ws.onmessage=e=>{
+    if(e.data instanceof ArrayBuffer){
+      // Binary frame: .dat download chunk
+      if(dlActive)dlChunks.push(new Uint8Array(e.data));
+      return;
+    }
     let msg;try{msg=JSON.parse(e.data);}catch(_){return;}
+    if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
+    if(msg.type==='dl_fail'){window.dispatchEvent(new CustomEvent('dl-fail',{detail:msg.error}));return;}
     if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
       const p=wsPending[msg.req_id];delete wsPending[msg.req_id];
       p.res(msg);return;
@@ -983,16 +991,40 @@ if(window.electron){
 };
 }
 
-// ── Download .dat → convert to CSV client-side ──
+// ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
-
+let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
+  if(dlActive){toast('已有下载进行中');return;}
+  if(!ws||ws.readyState!==1){toast('未连接');return;}
+  dlActive=true;dlChunks=[];
   toast('下载中...');
-  const resp=await fetch(DEVICE+'/api/download?file='+encodeURIComponent(fname));
-  if(!resp.ok){toast('下载失败');return;}
-  const buf=await resp.arrayBuffer();
-  const v=new DataView(buf);let csv='timestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
-  for(let o=0;o<buf.byteLength;o+=24){csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';}
+  ws.send(JSON.stringify({type:'cmd',cmd:'download_start',file:fname}));
+  // Data arrives as binary frames; dl_done JSON frame signals completion
+  await new Promise((res,rej)=>{
+    const t=setTimeout(()=>{cleanup();rej(new Error('timeout'));},30000);
+    function cleanup(){
+      clearTimeout(t);
+      window.removeEventListener('dl-done',onDone);
+      window.removeEventListener('dl-fail',onFail);
+      dlActive=false;
+    }
+    function onDone(){cleanup();res();}
+    function onFail(e){cleanup();rej(new Error(e.detail||'fail'));}
+    window.addEventListener('dl-done',onDone);
+    window.addEventListener('dl-fail',onFail);
+  }).catch(()=>{toast('下载失败');return;});
+  const total=dlChunks.reduce((n,c)=>n+c.length,0);
+  if(!total){toast('下载失败(空)');return;}
+  const u8=new Uint8Array(total);
+  let off=0;
+  for(const c of dlChunks){u8.set(c,off);off+=c.length;}
+  const v=new DataView(u8.buffer);
+  let csv='\ufefftimestamp_s,Voltage_V,Current_A,Power_W,Temp_C,Ambient_TempC\n';
+  for(let o=0;o+24<=total;o+=24){
+    csv+=[v.getUint32(o,true),v.getFloat32(o+4,true).toFixed(3),v.getFloat32(o+8,true).toFixed(3),
+      v.getFloat32(o+12,true).toFixed(3),v.getFloat32(o+16,true).toFixed(1),v.getFloat32(o+20,true).toFixed(1)].join(',')+'\n';
+  }
   toast('转换完成，请选择保存位置');
   const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
