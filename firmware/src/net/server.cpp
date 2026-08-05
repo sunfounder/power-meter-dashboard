@@ -887,23 +887,18 @@ void PowerMeterWebServer::setupRoutes() {
   _server.on("/api/logs", HTTP_GET, handleLogs);
   _server.on("/api/restart", HTTP_POST, handleRestart);
 
-  // Channel routes - explicit paths (no regex)
-  _server.on("/api/channel/0/record/start", HTTP_POST, handleChannelRecordStart);
-  _server.on("/api/channel/1/record/start", HTTP_POST, handleChannelRecordStart);
-  _server.on("/api/channel/2/record/start", HTTP_POST, handleChannelRecordStart);
-  _server.on("/api/channel/3/record/start", HTTP_POST, handleChannelRecordStart);
-  _server.on("/api/channel/0/record/stop",  HTTP_POST, handleChannelRecordStop);
-  _server.on("/api/channel/1/record/stop",  HTTP_POST, handleChannelRecordStop);
-  _server.on("/api/channel/2/record/stop",  HTTP_POST, handleChannelRecordStop);
-  _server.on("/api/channel/3/record/stop",  HTTP_POST, handleChannelRecordStop);
-  _server.on("/api/channel/0/record/data",  HTTP_GET, handleChannelRecordData);
-  _server.on("/api/channel/1/record/data",  HTTP_GET, handleChannelRecordData);
-  _server.on("/api/channel/2/record/data",  HTTP_GET, handleChannelRecordData);
-  _server.on("/api/channel/3/record/data",  HTTP_GET, handleChannelRecordData);
-  _server.on("/api/channel/0/record/all",   HTTP_GET, handleChannelRecordAll);
-  _server.on("/api/channel/1/record/all",   HTTP_GET, handleChannelRecordAll);
-  _server.on("/api/channel/2/record/all",   HTTP_GET, handleChannelRecordAll);
-  _server.on("/api/channel/3/record/all",   HTTP_GET, handleChannelRecordAll);
+  // Channel routes — registered in a loop (4 channels × 4 actions)
+  for (int ch = 0; ch < 4; ch++) {
+    char p[40];
+    snprintf(p, sizeof(p), "/api/channel/%d/record/start", ch);
+    _server.on(p, HTTP_POST, handleChannelRecordStart);
+    snprintf(p, sizeof(p), "/api/channel/%d/record/stop", ch);
+    _server.on(p, HTTP_POST, handleChannelRecordStop);
+    snprintf(p, sizeof(p), "/api/channel/%d/record/data", ch);
+    _server.on(p, HTTP_GET, handleChannelRecordData);
+    snprintf(p, sizeof(p), "/api/channel/%d/record/all", ch);
+    _server.on(p, HTTP_GET, handleChannelRecordAll);
+  }
   _server.on("/api/channel/0/name",         HTTP_POST, handleChannelRename);
   _server.on("/api/channel/1/name",         HTTP_POST, handleChannelRename);
   _server.on("/api/channel/2/name",         HTTP_POST, handleChannelRename);
