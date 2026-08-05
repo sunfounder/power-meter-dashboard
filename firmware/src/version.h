@@ -1,0 +1,12 @@
+#pragma once
+
+#define FIRMWARE_VERSION_MAJOR 0
+#define FIRMWARE_VERSION_MINOR 4
+#define FIRMWARE_VERSION_PATCH 0
+
+#define FIRMWARE_VERSION "0.4.0"
+#define PRODUCT_NAME "4CH Power Meter"
+
+// Framework compatibility macros
+#define PROJECT_NAME PRODUCT_NAME
+#define PROJECT_VERSION FIRMWARE_VERSION
