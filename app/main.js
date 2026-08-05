@@ -55,7 +55,6 @@ ipcMain.handle('save-log', async () => {
   }
   return null;
 });
-ipcMain.handle('get-log-path', () => '');
 ipcMain.handle('open-external', (e, url) => { shell.openExternal(url); return true; });
 
 // ── Update: background download → apply (extract+swap+restart) ──
