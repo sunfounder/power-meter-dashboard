@@ -89,6 +89,7 @@ static void printAPDiagnostics() {
 // Set by WiFi event callback (WiFi task context), handled in loop()
 volatile bool sta_dropped_flag = false;
 volatile uint8_t sta_drop_reason_flag = 0;
+bool ntp_done = false;  // NTP synced once (log only once)
 
 void setup() {
   Serial.begin(115200);
@@ -236,7 +237,8 @@ void loop() {
       int8_t tz = DeviceSettings::getInstance().tzOffset();
       ntpSync();
       Serial.printf("[NTP] Retry sync (UTC%+d)\n", tz);
-    } else {
+    } else if (!ntp_done) {
+      ntp_done = true;
       struct tm *tm = localtime(&t);
       Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d\n",
                     tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
