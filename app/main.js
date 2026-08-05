@@ -36,6 +36,7 @@ function log(msg) {
 ipcMain.on('min', () => mainWindow.minimize());
 ipcMain.on('max', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('close', () => mainWindow.close());
+ipcMain.on('devtools', () => mainWindow.webContents.openDevTools());
 
 // IPC: log from renderer
 ipcMain.on('log', (e, msg) => log('[WEB] ' + msg));

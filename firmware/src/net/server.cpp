@@ -245,8 +245,13 @@ static void channelToJson(JsonObject ch, const ChannelSample &c) {
   ch["connected"]        = c.connected;
 }
 
+// Set when a WS command needs the send queue (e.g. large record_all responses):
+// broadcast pauses for a while so the response isn't stuck behind 1s broadcasts.
+volatile uint32_t ws_send_busy_until = 0;
+
 void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   if (!_running) return;
+  if (millis() < ws_send_busy_until) return;  // paused: large response in flight
 
   auto &cfg = DeviceSettings::getInstance();
   auto &recorder = DataRecorder::getInstance();
@@ -377,6 +382,8 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         if (offset < 0) offset = 0;
         if (limit < 1) limit = 1;
         if (limit > 500) limit = 500;
+        // Pause broadcasts so this (large) response isn't stuck in the send queue
+        ws_send_busy_until = millis() + 2500;
         JsonArray arr = ack["data"].to<JsonArray>();
         channelRecordAllToJson(arr, ch, offset, limit);
         ack["ok"] = true;

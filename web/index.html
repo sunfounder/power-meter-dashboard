@@ -182,7 +182,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?')){wsSend({type:'cmd',cmd:'restart'});}">重启</button>
     <button class="btn-buzz" onclick="checkUpdate()" id="btnUpdate" style="width:100%;margin-top:4px">检查更新</button>
-    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
+    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button>
+    <button class="btn-buzz" onclick="if(window.electron)window.electron.devtools()" style="width:100%;margin-top:4px">调试面板</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:12px;color:var(--dim)"><span id="dashVer"></span></div>
   </div>
@@ -248,8 +249,7 @@ function setDevice(ip){
   for(let i=0;i<4;i++){if(charts[i]){charts[i].dispose();charts[i]=null;}}
   build();
   connectWS(ip);
-  // Fetch firmware version once
-  wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;}).catch(()=>{});
+  // Firmware version + stop conditions sync happens in ws.onopen
 }
 // ── WebSocket primary data channel ──
 let ws=null, wsTimer=null, wsRetry=0;
@@ -257,14 +257,42 @@ function connectWS(ip){
   if(ws)try{ws.close();}catch(_){}
   ws=new WebSocket('ws://'+ip+'/ws');
   ws.binaryType='arraybuffer';
-  ws.onopen=()=>{document.getElementById('connDot').className='conn-dot';wsRetry=0;};
+  ws.onopen=()=>{
+    console.log('[WS] connected to '+ip);
+    document.getElementById('connDot').className='conn-dot';
+    wsRetry=0;
+    // Connection is live now — sync stop conditions + firmware version
+    loadStopConds();
+    wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{
+      if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;
+    }).catch(()=>{});
+  };
+  ws.onerror=e=>console.log('[WS] error',e.message||e.type);
+  ws.onclose=e=>{
+    console.log('[WS] closed code='+e.code+' reason='+e.reason);
+    document.getElementById('connDot').className='conn-dot lost';
+    if(++wsRetry<3){wsTimer=setTimeout(()=>{console.log('[WS] retry '+wsRetry);connectWS(ip);},3000);}
+    else if(!document.getElementById('connOverlay').classList.contains('show')){
+      console.log('[WS] giving up — show connect screen');
+      document.body.classList.add('locked');
+      document.getElementById('connOverlay').classList.remove('hide');
+    }
+  };
   ws.onmessage=e=>{
     if(e.data instanceof ArrayBuffer){
       // Binary frame: .dat download chunk
-      if(dlActive)dlChunks.push(new Uint8Array(e.data));
+      if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
       return;
     }
-    let msg;try{msg=JSON.parse(e.data);}catch(_){return;}
+    let msg;try{msg=JSON.parse(e.data);}catch(_){console.log('[WS] BAD JSON frame len='+e.data.length+' head='+String(e.data).slice(0,80));return;}
+    if(msg.type==='measurement'){
+      const chs=msg.data&&msg.data.channels?msg.data.channels:[];
+      const amb=msg.data&&msg.data.env?msg.data.env.ambient_temp_C:'?';
+      const rec=msg.data&&msg.data.recording?msg.data.recording.map(r=>r&&r.active?'R':'-').join(''):'?';
+      console.log('[WS] measurement ch='+chs.map(c=>c&&c.connected?'1':'0').join('')+' amb='+amb+' rec='+rec);
+    }
+    else if(msg.type==='ack')console.log('[WS] ack',msg.cmd,msg.ok);
+    else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
     if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
     if(msg.type==='dl_fail'){window.dispatchEvent(new CustomEvent('dl-fail',{detail:msg.error}));return;}
     if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
@@ -274,13 +302,6 @@ function connectWS(ip){
     if(msg.type==='measurement'){processData(msg.data);}
     else if(msg.type==='alarm')toast(msg.message);
   };
-  ws.onclose=()=>{
-    document.getElementById('connDot').className='conn-dot lost';
-    // Reconnect with backoff; show connect screen after 3 failures
-    if(wsRetry++<3){wsTimer=setTimeout(()=>connectWS(ip),1000*wsRetry);}
-    else{disconnect();}
-  };
-  ws.onerror=()=>{};
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
@@ -375,7 +396,7 @@ function build(){
     if(a)a.className='toggle-btn'+(absMode[i]?' active':'');
     if(b)b.className='toggle-btn'+(absMode[i]?'':' active');
   }
-  loadStopConds();
+  // loadStopConds is called from WS onopen (needs live connection)
 }
 function applyStopUI(i){
   const en=document.getElementById('se'+i).checked;
@@ -604,7 +625,8 @@ function redrawChart(i){
 function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
-  const amb=d.ambient_temp_C;
+  // Ambient temp: WS broadcast nests it under env, HTTP status has it top-level
+  const amb=(d.env&&d.env.ambient_temp_C!=null)?d.env.ambient_temp_C:d.ambient_temp_C;
   document.getElementById('ambTemp').textContent=(amb==null||amb<-100)?'---':convTemp(amb).toFixed(1)+' '+ut();
   if(d.timestamp){
     const dt=new Date(d.timestamp*1000);
@@ -979,16 +1001,6 @@ if(window.electron){
   });
   updBtnInit();
   showJustUpdated();
-  const orig=api;api=function(p,o){
-  const full=DEVICE+p;
-  return orig(p,o).then(r=>{
-    window.electron.apiLog({url:p,full,ok:r!==null,ts:Date.now()});
-    return r;
-  }).catch(e=>{
-    window.electron.apiLog({url:p,full,error:e.message,ts:Date.now()});
-    return null;
-  });
-};
 }
 
 // ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
@@ -1036,18 +1048,26 @@ async function loadBufferData(i){
   const ld=document.getElementById('cload'+i);
   if(ld)ld.style.display='flex';
   try{
-  // Paginated fetch: pull all samples in 300-sample pages (device can't
+  // Paginated fetch: pull all samples in pages (device can't
   // serialize a whole .dat to JSON at once without OOM)
-  const PAGE=300;
+  const PAGE=200;
   let all=[];
   let off=0;
+  let pages=0;
   for(;;){
-    const d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE});
-    if(!d||!d.data||!d.data.length)break;
+    // Retry each page (AsyncTCP send queue can drop frames under broadcast)
+    let d=null;
+    for(let r=0;r<3&&!d;r++){
+      try{d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE},12000);}
+      catch(e){console.log('[HIST] ch'+i+' page '+off+' try '+r+' failed: '+e.message);}
+    }
+    if(!d||!d.data||!d.data.length){console.log('[HIST] ch'+i+' end at offset '+off);break;}
+    pages++;
     all=all.concat(d.data);
     if(d.data.length<PAGE)break;
     off+=PAGE;
   }
+  console.log('[HIST] ch'+i+' pulled '+all.length+' samples in '+pages+' page(s)');
   if(!all.length)return;
   const c=charts[i];if(!c)return;
   sampleCount[i]=Math.max(sampleCount[i]||0,all.length);

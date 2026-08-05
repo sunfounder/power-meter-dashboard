@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electron', {
   min: () => ipcRenderer.send('min'),
   max: () => ipcRenderer.send('max'),
   close: () => ipcRenderer.send('close'),
+  devtools: () => ipcRenderer.send('devtools'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   downloadUpdate: (url) => ipcRenderer.invoke('download-update', url),
   applyUpdate: () => ipcRenderer.invoke('apply-update'),
