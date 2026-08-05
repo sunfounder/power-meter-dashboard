@@ -37,6 +37,10 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 .m-value{flex:1;padding:3px 6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 .m-unit{padding:3px 7px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;min-width:28px;justify-content:center}
 .ch-chart-box{background:#0a0a0a;border:1px solid #222;border-radius:8px;overflow:hidden;flex:1;min-width:0;min-height:0}
+.ch-chart-wrap{position:relative;flex:1;min-width:0;min-height:0;display:flex}
+.chart-loading{position:absolute;inset:0;background:rgba(10,10,10,0.6);display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:5}
+.spinner{width:22px;height:22px;border:3px solid #333;border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .data-bar{display:flex;align-items:center;gap:6px;margin-top:6px;padding:4px 8px;background:#0c0c0c;border-radius:6px;border:1px solid #1a1a1a;font-size:11px;flex-wrap:wrap}
 .rec-name-group{display:flex;align-items:center;gap:4px}
 .rec-name{color:var(--dim);font-size:10px}
@@ -119,6 +123,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
+    <button class="btn-icon" onclick="toggleHideCh()" id="btnHideCh" title="显示未连接通道"><i class="fa fa-eye-slash"></i></button>
     <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
@@ -137,6 +142,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>时区</label><select id="setTz" onchange="saveSet('tz_offset',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="-12">UTC-12</option><option value="-8">UTC-8 PST</option><option value="-5">UTC-5 EST</option><option value="0">UTC+0 GMT</option><option value="1">UTC+1 CET</option><option value="5">UTC+5</option><option value="8" selected>UTC+8 China</option><option value="9">UTC+9 Japan</option></select></div>
     <!-- rotation hidden until LVGL driver supports it -->
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
+    <div class="section"><label>电流/功率显示</label><div class="toggle-group"><button class="toggle-btn" onclick="setAbs(0)" id="absOff">带符号</button><button class="toggle-btn" onclick="setAbs(1)" id="absOn">绝对值</button></div></div>
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:#0a0a0a;color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
@@ -196,6 +202,9 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 
 <script>
 const DASH_VER='1.2.10'; // bump with each release
+let absMode=localStorage.getItem('pm_abs')!=='0';  // default: absolute values
+const disp=v=>absMode?Math.abs(v):v;
+let hideDisconnected=localStorage.getItem('pm_hidech')!=='0';  // default: hide unconnected
 let DEVICE='',pollTimer=null;
 const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
 const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
@@ -309,7 +318,7 @@ function build(){
       '<div class="ch-cards">'+['V','A','W','C'].map((m,j)=>
         '<div class="m-card"><span class="m-value dim" id="cv'+i+'_'+j+'">---</span><span class="m-unit" id="cu'+i+'_'+j+'" style="background:'+C[j]+';cursor:pointer" onclick="toggleSeries('+i+','+j+')">'+m+'</span></div>'
       ).join('')+'</div></div>'+
-      '<div class="ch-chart-box" id="cx'+i+'"></div></div>'+
+      '<div class="ch-chart-wrap" id="cw'+i+'"><div class="ch-chart-box" id="cx'+i+'"></div><div class="chart-loading" id="cload'+i+'" style="display:none"><div class="spinner"></div></div></div></div>'+
       '<div class="data-bar">'+
       '<div class="rec-name-group" id="rng'+i+'"><span class="rec-name" id="rn'+i+'">'+pfx[i]+'</span><input class="rec-name-input" id="rni'+i+'" maxlength="20"><button class="btn-edit-rec" onclick="editRecName('+i+')"><i class="fa fa-pen"></i></button></div>'+
       '<span class="timer" id="ct'+i+'">00:00</span>'+
@@ -366,14 +375,21 @@ function ic(i){
     dataZoom:[{type:'inside',start:0,end:100}],
     xAxis:{type:'value',min:0,axisLabel:{color:'#555',fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
     yAxis:[
-      {type:'value',name:'',splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},splitArea:{show:false}},
-      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}},
-      {type:'value',name:'',splitLine:{show:false},axisLabel:{show:false}}
+      // abs mode: 0 at bottom (positive data only); signed mode: symmetric, 0 centered
+      {type:'value',min:v=>absMode?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{lineStyle:{color:'#1a1a1a'}},axisLabel:{show:false},splitArea:{show:false}},
+      {type:'value',min:v=>absMode?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{show:false},axisLabel:{show:false}},
+      {type:'value',splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
-      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',markLine:{symbol:'none',silent:true,lineStyle:{color:'#555',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
+      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
+        areaStyle:{color:C[0],opacity:0.12},
+        markLine:{symbol:'none',silent:true,lineStyle:{color:'#888',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
+      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
+        areaStyle:{color:C[1],opacity:0.12},
+        markLine:{symbol:'none',silent:true,lineStyle:{color:'#888',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
+      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
+        areaStyle:{color:C[2],opacity:0.12},
+        markLine:{symbol:'none',silent:true,lineStyle:{color:'#888',type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
       {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
     ],animation:false});
 }
@@ -469,6 +485,33 @@ function updateTables(){
 // Manual refresh: full page reload (reconnects via saved IP)
 function refreshAll(){ location.reload(); }
 
+function toggleHideCh(){
+  hideDisconnected=!hideDisconnected;
+  localStorage.setItem('pm_hidech',hideDisconnected?'1':'0');
+  const b=document.getElementById('btnHideCh');
+  if(b){b.innerHTML=hideDisconnected?'<i class="fa fa-eye-slash"></i>':'<i class="fa fa-eye"></i>';b.title=hideDisconnected?'显示未连接通道':'隐藏未连接通道';}
+  if(lastData)up();
+}
+function setAbs(mode){
+  absMode=!!mode;
+  localStorage.setItem('pm_abs',absMode?'1':'0');
+  const a=document.getElementById('absOn'),b=document.getElementById('absOff');
+  if(a)a.className='toggle-btn'+(absMode?' active':'');
+  if(b)b.className='toggle-btn'+(absMode?'':' active');
+  // Re-render charts with abs/signed values, refresh numbers
+  for(let i=0;i<4;i++)redrawChart(i);
+  if(lastData)up();
+}
+function redrawChart(i){
+  const c=charts[i];if(!c||!dataStore[i])return;
+  const opts={series:[]};
+  for(let m=0;m<4;m++){
+    const key=['V','A','W','C'][m];
+    const data=dataStore[i].map((p,j)=>[j,disp(p[key])]);
+    opts.series.push({data});
+  }
+  c.setOption(opts,{notMerge:false});
+}
 function up(){
   if(!lastData)return;
   const d=lastData,chs=d.channels;
@@ -482,13 +525,15 @@ function up(){
 
   for(let i=0;i<4;i++){
     const ch=chs[i];if(!ch)continue;const ok=ch.connected;
+    const row=document.getElementById('cr'+i);
+    if(row)row.style.display=(hideDisconnected&&!ok)?'none':'';
     for(let j=0;j<4;j++){
       const el=document.getElementById('cv'+i+'_'+j);if(!el)continue;
       if(!ok){el.textContent='---';el.className='m-value dim';continue;}
       let raw=ch[MKEYS[j]];if(raw==null||isNaN(raw))raw=0;
       if(j===3&&raw<-100){el.textContent='---';el.className='m-value dim';continue;}
       if(j===3)raw=convTemp(raw);
-      el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?(raw/1000).toFixed(3):raw.toFixed(1));
+      el.textContent=(['V','A','W','C'][j]==='V'?raw.toFixed(2):['A','W'].includes(['V','A','W','C'][j])?disp(raw/1000).toFixed(3):raw.toFixed(1));
       el.className='m-value';
     }
     // keep channel names as CH1-CH4, don't sync from server
@@ -528,7 +573,7 @@ function uc(){
     const opts={series:[]};
     for(let m=0;m<4;m++){
       const data=[...c.getOption().series[m].data];
-      data.push([idx,pts[m]]);
+      data.push([idx,disp(pts[m])]);
       opts.series.push({data});
     }
     c.setOption(opts,{notMerge:false});
@@ -660,6 +705,9 @@ function openSettings(){
     document.getElementById('rot0').className='toggle-btn'+(r==0?' active':'');
     document.getElementById('rot180').className='toggle-btn'+(r==180?' active':'');
     document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
+    const a=document.getElementById('absOn'),b=document.getElementById('absOff');
+    if(a)a.className='toggle-btn'+(absMode?' active':'');
+    if(b)b.className='toggle-btn'+(absMode?'':' active');
     document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
     document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
     document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
@@ -862,6 +910,9 @@ async function downloadCSV(i){
 
 // ── Pull buffered data to fill chart after page refresh ──
 async function loadBufferData(i){
+  const ld=document.getElementById('cload'+i);
+  if(ld)ld.style.display='flex';
+  try{
   // Paginated fetch: pull all samples in 300-sample pages (device can't
   // serialize a whole .dat to JSON at once without OOM)
   const PAGE=300;
@@ -881,10 +932,13 @@ async function loadBufferData(i){
   const opts={series:[]};
   for(let m=0;m<4;m++){
     const key=['V','A','W','C'][m];
-    const data=all.map((p,j)=>[j,parseFloat(p[key])||0]);
+    const data=all.map((p,j)=>[j,disp(parseFloat(p[key])||0)]);
     opts.series.push({data});
   }
   c.setOption(opts,{notMerge:false});
+  }finally{
+    if(ld)ld.style.display='none';
+  }
 }
 </script>
 </body>
