@@ -221,7 +221,7 @@ let absMode=[true,true,true,true];
 try{const s=JSON.parse(localStorage.getItem('pm_abs')||'null');if(Array.isArray(s))absMode=s;}catch(_){}
 const disp=(v,i)=>absMode[i]?Math.abs(v):v;
 let hideDisconnected=localStorage.getItem('pm_hidech')!=='0';  // default: hide unconnected
-let DEVICE='',pollTimer=null;
+let DEVICE='';
 const C=['#e27005','#3cb84c','#4895ef','#e0c040'];
 const MKEYS=['bus_voltage_V','current_mA','power_mW','channel_temp_C'];
 let lastData=null,charts=[null,null,null,null],names=['CH1','CH2','CH3','CH4'],pfx=['test','test','test','test'];
@@ -247,10 +247,28 @@ function setDevice(ip){
   document.body.classList.remove('locked');saveIP(ip);
   for(let i=0;i<4;i++){if(charts[i]){charts[i].dispose();charts[i]=null;}}
   build();
-  if(pollTimer)clearInterval(pollTimer);
-  poll();pollTimer=setInterval(poll,2000);
+  connectWS(ip);
   // Fetch firmware version once
   api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
+}
+// ── WebSocket primary data channel ──
+let ws=null, wsTimer=null, wsRetry=0;
+function connectWS(ip){
+  if(ws)try{ws.close();}catch(_){}
+  ws=new WebSocket('ws://'+ip+'/ws');
+  ws.onopen=()=>{document.getElementById('connDot').className='conn-dot';wsRetry=0;};
+  ws.onmessage=e=>{
+    let msg;try{msg=JSON.parse(e.data);}catch(_){return;}
+    if(msg.type==='measurement'){processData(msg.data);}
+    else if(msg.type==='alarm')toast(msg.message);
+  };
+  ws.onclose=()=>{
+    document.getElementById('connDot').className='conn-dot lost';
+    // Reconnect with backoff; show connect screen after 3 failures
+    if(wsRetry++<3){wsTimer=setTimeout(()=>connectWS(ip),1000*wsRetry);}
+    else{disconnect();}
+  };
+  ws.onerror=()=>{};
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
@@ -262,7 +280,9 @@ function doConnect(){
   }).catch(()=>{document.getElementById('connErr').textContent='Cannot reach '+ip;});
 }
 function disconnect(){
-  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  if(wsTimer)clearTimeout(wsTimer);
+  if(ws)try{ws.close();}catch(_){}
+  ws=null;
   document.body.classList.add('locked');
   document.getElementById('connDot').className='conn-dot lost';
   document.getElementById('connOverlay').classList.remove('hide');
@@ -442,9 +462,9 @@ function ic(i){
   c.on('click',p=>{ if(p&&p.dataIndex!=null)selChart(i,p.dataIndex); });
 }
 
-function poll(){
-  api('/api/status').then(d=>{
-    if(!d){document.getElementById('connDot').className='conn-dot lost';return;}
+// Process one measurement payload (from WebSocket)
+function processData(d){
+    if(!d)return;
     lastData=d;document.getElementById('connDot').className='conn-dot';
     if(d.temp_unit){tempUnit=d.temp_unit;}
     // Live WiFi status: update settings box + follow IP drift after reconnect
@@ -502,7 +522,6 @@ function poll(){
       }
     }
     up();uc();updateTables();
-  });
 }
 
 function updateTables(){

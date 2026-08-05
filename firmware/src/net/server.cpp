@@ -75,7 +75,6 @@ PowerMeterWebServer::PowerMeterWebServer() : _running(false), _ap_mode(true), _l
 bool PowerMeterWebServer::begin() {
   setupRoutes();
   setupWebSocket();
-  _server.setMaxClients(MAX_HTTP_CLIENTS);
   _server.begin();
   _running = true;
   Serial.println("[WS] Web server started on port 80");
@@ -276,6 +275,12 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   // Aggregate
   data["any_recording"] = recorder.isAnyRecording();
   data["temp_unit"] = String(DeviceSettings::getInstance().tempUnit());
+  data["scope_ch"] = MeasurementEngine::getInstance().fastChannel();
+
+  // Live WiFi status (same fields as /api/status)
+  data["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
+  data["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("");
+  data["wifi_ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("");
 
   String json;
   serializeJson(doc, json);

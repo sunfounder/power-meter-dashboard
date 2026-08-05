@@ -221,7 +221,10 @@ void loop() {
                   (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA));
   }
 
-  if (now - last_web_broadcast >= 500) {
+  // Broadcast over WebSocket at the configured sample rate (default 1s)
+  uint32_t bcast_ms = DeviceSettings::getInstance().sampleIntervalMs();
+  if (bcast_ms < 100) bcast_ms = 100;
+  if (now - last_web_broadcast >= bcast_ms) {
     last_web_broadcast = now;
     PowerMeterWebServer::getInstance().broadcastData(
         MeasurementEngine::getInstance().getLatest());
