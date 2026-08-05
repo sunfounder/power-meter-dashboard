@@ -184,7 +184,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <button class="btn-buzz" onclick="checkUpdate()" id="btnUpdate" style="width:100%;margin-top:4px">检查更新</button>
     <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
-    <div style="text-align:center;font-size:12px;color:var(--dim)">Dashboard v1.3.0</div>
+    <div style="text-align:center;font-size:12px;color:var(--dim)"><span id="dashVer"></span></div>
   </div>
 </div>
 <div class="modal-overlay" id="filesOverlay">
@@ -298,6 +298,8 @@ function saveStop(i){
   document.body.classList.toggle('theme-light',theme==='light');
   const tb=document.getElementById('btnTheme');
   if(tb)tb.innerHTML=theme==='dark'?'<i class="fa fa-sun"></i>':'<i class="fa fa-moon"></i>';
+  const dv=document.getElementById('dashVer');
+  if(dv)dv.textContent='Dashboard v'+DASH_VER;
   const ip=(new URLSearchParams(location.search)).get('ip')||getSavedIP();
   if(ip){document.getElementById('connIP').value=ip;doConnect();}
   else{document.body.classList.add('locked');document.getElementById('connOverlay').classList.remove('hide');}
@@ -361,13 +363,11 @@ function applyStopUI(i){
 }
 function loadStopConds(){
   api('/api/settings').then(d=>{
-    if(window.electron)window.electron.log('[SYNC] stop_cond='+JSON.stringify(d&&d.stop_cond));
     if(!d||!d.stop_cond)return;
     for(let i=0;i<4;i++){
       const sc=d.stop_cond[i];if(!sc)continue;
       const se=document.getElementById('se'+i);
       if(se)se.checked=!!sc.en;
-      if(window.electron)window.electron.log('[SYNC2] ch'+i+' se='+(se?'FOUND':'NULL')+' setChecked='+(!!sc.en));
       const setItem=(sid,cid,val,dispVal)=>{
         const s=document.getElementById(sid),c=document.getElementById(cid);
         if(c)c.checked=val>0;

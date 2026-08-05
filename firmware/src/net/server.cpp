@@ -35,7 +35,6 @@ static void handleListFiles(AsyncWebServerRequest *request);
 static void handleDownload(AsyncWebServerRequest *request);
 static void handleDeleteFile(AsyncWebServerRequest *request);
 static void handleWifiConfig(AsyncWebServerRequest *request);
-static void handleChannelRecordData(AsyncWebServerRequest *request);
 static void handleChannelRecordAll(AsyncWebServerRequest *request);
 
 // GET /api/storage — LittleFS space info
@@ -229,6 +228,16 @@ bool PowerMeterWebServer::isConnected() const {
   return _ap_mode ? true : (WiFi.status() == WL_CONNECTED);
 }
 
+// Shared: serialize one measurement channel into a JSON object
+static void channelToJson(JsonObject ch, const ChannelSample &c) {
+  ch["bus_voltage_V"]    = c.bus_voltage_V;
+  ch["shunt_voltage_mV"] = c.shunt_voltage_mV;
+  ch["current_mA"]       = c.current_mA;
+  ch["power_mW"]         = c.power_mW;
+  ch["channel_temp_C"]   = c.channel_temp_C;
+  ch["connected"]        = c.connected;
+}
+
 void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   if (!_running) return;
 
@@ -243,12 +252,7 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   JsonArray ch_arr = data["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {
     JsonObject ch = ch_arr.add<JsonObject>();
-    ch["bus_voltage_V"]    = snap.channels[i].bus_voltage_V;
-    ch["shunt_voltage_mV"] = snap.channels[i].shunt_voltage_mV;
-    ch["current_mA"]       = snap.channels[i].current_mA;
-    ch["power_mW"]         = snap.channels[i].power_mW;
-    ch["channel_temp_C"]   = snap.channels[i].channel_temp_C;
-    ch["connected"]        = snap.channels[i].connected;
+    channelToJson(ch, snap.channels[i]);
     ch["name"]             = cfg.channelName(i);
   }
   data["env"]["ambient_temp_C"] = snap.env.ambient_temp_C;
@@ -337,12 +341,7 @@ static void handleStatus(AsyncWebServerRequest *request) {
   JsonArray ch_arr = doc["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {
     JsonObject ch = ch_arr.add<JsonObject>();
-    ch["bus_voltage_V"]    = snap.channels[i].bus_voltage_V;
-    ch["shunt_voltage_mV"] = snap.channels[i].shunt_voltage_mV;
-    ch["current_mA"]       = snap.channels[i].current_mA;
-    ch["power_mW"]         = snap.channels[i].power_mW;
-    ch["channel_temp_C"]   = snap.channels[i].channel_temp_C;
-    ch["connected"]        = snap.channels[i].connected;
+    channelToJson(ch, snap.channels[i]);
     ch["name"]  = cfg.channelName(i);
   }
 
@@ -628,28 +627,6 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
   request->send(200, "application/json", json);
 }
 
-// GET /api/channel/<ch>/record/data  — buffered samples only
-static void handleChannelRecordData(AsyncWebServerRequest *request) {
-  int ch = parseChannelFromUrl(request->url());
-  if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
-  auto &rec = DataRecorder::getInstance();
-  JsonDocument doc;
-  JsonArray arr = doc.to<JsonArray>();
-  uint16_t head = rec.bufferHead(ch), cnt = rec.bufferCount(ch);
-  int start = (head - cnt + 60) % 60;
-  for (uint16_t i = 0; i < cnt; i++) {
-    const SampleBin &b = rec.bufferData(ch)[(start + i) % 60];
-    JsonObject o = arr.add<JsonObject>();
-    o["t"] = b.timestamp;
-    o["V"] = serialized(String(b.bus_voltage_V, 3));
-    o["A"] = serialized(String(b.current_A, 3));
-    o["W"] = serialized(String(b.power_W, 3));
-    o["C"] = serialized(String(b.channel_temp_C, 1));
-  }
-  String json; serializeJson(doc, json);
-  request->send(200, "application/json", json);
-}
-
 // POST /api/channel/<ch>/record/stop
 static void handleChannelRecordStop(AsyncWebServerRequest *request) {
   int ch = parseChannelFromUrl(request->url());
@@ -895,7 +872,6 @@ void PowerMeterWebServer::setupRoutes() {
     snprintf(p, sizeof(p), "/api/channel/%d/record/stop", ch);
     _server.on(p, HTTP_POST, handleChannelRecordStop);
     snprintf(p, sizeof(p), "/api/channel/%d/record/data", ch);
-    _server.on(p, HTTP_GET, handleChannelRecordData);
     snprintf(p, sizeof(p), "/api/channel/%d/record/all", ch);
     _server.on(p, HTTP_GET, handleChannelRecordAll);
   }

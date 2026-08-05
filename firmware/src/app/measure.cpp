@@ -255,17 +255,6 @@ void MeasurementEngine::checkAutoStop() {
   for (int ch = 0; ch < 4; ch++) {
     if (!rec.isChannelRecording(ch)) { below_cnt[ch] = 0; continue; }
     auto &sc = cfg.stopCond(ch);
-    // DIAG: log every 30th check while recording
-    {
-      static uint32_t diag_cnt = 0;
-      if ((diag_cnt++ % 30) == 0) {
-        auto &s = _snapshot.channels[ch];
-        Serial.printf("[ASTOP] CH%d en=%d Vth=%.2f mAth=%.1f min=%u fall=%d armedV=%d armedmA=%d | V=%.2f mA=%.1f below_cnt=%u\n",
-                      ch+1, sc.enabled, sc.voltage_threshold_V, sc.current_threshold_mA,
-                      sc.max_duration_min, sc.falling_edge, sc.armed_V, sc.armed_mA,
-                      s.bus_voltage_V, s.current_mA, below_cnt[ch]);
-      }
-    }
     if (!sc.enabled) continue;
     uint32_t elapsed_s = (millis() - rec.channelState(ch).start_time) / 1000;
     if (sc.max_duration_min > 0 && elapsed_s >= sc.max_duration_min * 60UL) {

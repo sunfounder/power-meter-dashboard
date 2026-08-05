@@ -1,6 +1,5 @@
 #include "config.h"
 #include <Preferences.h>
-#include <LittleFS.h>
 
 DeviceSettings &DeviceSettings::getInstance() {
   static DeviceSettings instance;
