@@ -189,7 +189,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
 </div>
 <div class="modal-overlay" id="filesOverlay">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">文件</h2><div><button class="btn-icon" onclick="selectAllFiles()" title="全选"><i class="fa fa-check-double"></i></button><button class="btn-icon" onclick="delSelected()" title="删除选中" style="display:none" id="btnDelSel"><i class="fa fa-trash"></i></button><button class="btn-icon" onclick="closeModal('filesOverlay')">X</button></div></div>
     <div id="storageBar" style="margin-bottom:8px"></div>
     <div id="fileList" style="max-height:300px;overflow-y:auto">加载中...</div>
   </div>
@@ -826,6 +826,12 @@ function loadFiles(){
 function onFileCheck(){
   const cbs=document.querySelectorAll('.file-cb:checked');
   document.getElementById('btnDelSel').style.display=cbs.length?'inline-block':'none';
+}
+function selectAllFiles(){
+  const cbs=document.querySelectorAll('.file-cb');
+  const allChecked=[...cbs].every(c=>c.checked);
+  cbs.forEach(c=>c.checked=!allChecked);
+  onFileCheck();
 }
 function delSelected(){
   const cbs=document.querySelectorAll('.file-cb:checked');
