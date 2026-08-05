@@ -40,6 +40,9 @@ static void handleDownload(AsyncWebServerRequest *request);
 static void handleDeleteFile(AsyncWebServerRequest *request);
 static void handleWifiConfig(AsyncWebServerRequest *request);
 static void handleChannelRecordAll(AsyncWebServerRequest *request);
+// Shared JSON builders (WS + HTTP)
+static void settingsToJson(JsonDocument &doc);
+static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit);
 
 // GET /api/storage — LittleFS space info
 static void handleStorage(AsyncWebServerRequest *request) {
@@ -325,6 +328,107 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
   } else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("[WS] Client #%u disconnected\n", client->id());
+  } else if (type == WS_EVT_DATA) {
+    // APP commands over WebSocket: {type:'cmd', cmd:..., ...}
+    if (!data || !len) return;
+    JsonDocument doc;
+    if (deserializeJson(doc, (const char*)data, len)) return;
+    String cmd = doc["cmd"] | "";
+    JsonDocument ack;
+    ack["type"] = "ack";
+    ack["cmd"] = cmd;
+
+    if (cmd == "record_start") {
+      int ch = doc["ch"] | -1;
+      String name = doc["name"] | "test";
+      if (ch >= 0 && ch <= 3) {
+        auto &rec = DataRecorder::getInstance();
+        if (rec.isChannelRecording(ch)) rec.renameCurrent(ch, name.c_str());
+        else ack["ok"] = rec.startChannel(ch, name.c_str());
+        ack["ok"] = true;
+      } else ack["ok"] = false;
+    } else if (cmd == "record_stop") {
+      int ch = doc["ch"] | -1;
+      if (ch >= 0 && ch <= 3) {
+        DataRecorder::getInstance().stopChannel(ch);
+        ack["ok"] = true;
+      } else ack["ok"] = false;
+    } else if (cmd == "delete") {
+      String fname = doc["file"] | "";
+      if (fname.length() && fname.indexOf('/') < 0 && fname.indexOf('\\') < 0) {
+        String path = "/data/" + fname;
+        ack["ok"] = LittleFS.exists(path) ? LittleFS.remove(path) : false;
+      } else ack["ok"] = false;
+    } else if (cmd == "get_settings") {
+      JsonDocument sdoc;
+      settingsToJson(sdoc);
+      sdoc["type"] = "ack";
+      sdoc["cmd"] = "get_settings";
+      String sjson;
+      serializeJson(sdoc, sjson);
+      client->text(sjson);
+      return;  // already sent full ack
+    } else if (cmd == "record_all") {
+      int ch = doc["ch"] | -1;
+      int offset = doc["offset"] | 0;
+      int limit = doc["limit"] | 300;
+      if (ch < 0 || ch > 3) { ack["ok"] = false; }
+      else {
+        if (offset < 0) offset = 0;
+        if (limit < 1) limit = 1;
+        if (limit > 500) limit = 500;
+        JsonArray arr = ack["data"].to<JsonArray>();
+        channelRecordAllToJson(arr, ch, offset, limit);
+        ack["ok"] = true;
+      }
+    } else if (cmd == "files") {
+      auto &rec = DataRecorder::getInstance();
+      JsonArray arr = ack["data"].to<JsonArray>();
+      rec.listFilesToJson(arr);
+      ack["ok"] = true;
+    } else if (cmd == "storage") {
+      FSInfo64 info;
+      LittleFS.info(info);
+      ack["total_kb"] = info.totalBytes / 1024;
+      ack["used_kb"]  = info.usedBytes / 1024;
+      ack["free_kb"]  = (info.totalBytes - info.usedBytes) / 1024;
+      ack["ok"] = true;
+    } else if (cmd == "restart") {
+      ack["ok"] = true;
+      String ack_json;
+      serializeJson(ack, ack_json);
+      client->text(ack_json);
+      delay(100);
+      ESP.restart();
+      return;
+    } else if (cmd == "settings") {
+      // Same params as POST /api/settings
+      auto &cfg = DeviceSettings::getInstance();
+      if (doc["device_name"]) { cfg.setDeviceName(doc["device_name"]); }
+      if (doc["ap_password"]) { cfg.setAPPassword(doc["ap_password"]); }
+      if (doc["wifi_ssid"])   { cfg.setWiFi(doc["wifi_ssid"], doc["wifi_password"] | cfg.wifiPassword()); }
+      if (doc["temp_unit"])   { cfg.setTempUnit(((String)(const char*)doc["temp_unit"])[0]); }
+      if (doc["tz_offset"])   { cfg.setTzOffset(doc["tz_offset"]); }
+      if (doc["sample_interval_ms"]) { cfg.setSampleIntervalMs(doc["sample_interval_ms"]); }
+      if (doc["amb_temp_offset"]) { cfg.setAmbTempOffset(doc["amb_temp_offset"]); }
+      if (doc["stop_ch"]) {
+        int ch = doc["stop_ch"];
+        cfg.setStopCond(ch,
+          ((String)(const char*)(doc["stop_en"] | "0")) == "1",
+          doc["stop_v"] | 0.0f,
+          doc["stop_mA"] | 0.0f,
+          doc["stop_min"] | 0,
+          ((String)(const char*)(doc["stop_fall"] | "1")) == "1");
+      }
+      cfg.save();
+      ack["ok"] = true;
+    } else {
+      ack["ok"] = false;
+      ack["error"] = "unknown cmd";
+    }
+    String ack_json;
+    serializeJson(ack, ack_json);
+    client->text(ack_json);
   }
 }
 
@@ -481,6 +585,15 @@ static void handleSettings(AsyncWebServerRequest *request) {
 
   // GET: return all settings
   JsonDocument doc;
+  settingsToJson(doc);
+  String json;
+  serializeJson(doc, json);
+  request->send(200, "application/json", json);
+}
+
+// Shared: fill a JSON doc with all settings (GET /api/settings + WS get_settings)
+static void settingsToJson(JsonDocument &doc) {
+  auto &cfg = DeviceSettings::getInstance();
   doc["device_name"]    = cfg.deviceName();
   doc["ap_password"]    = "***";
   doc["wifi_ssid"]      = cfg.wifiSSID();
@@ -528,10 +641,6 @@ static void handleSettings(AsyncWebServerRequest *request) {
   for (int i = 0; i < 4; i++) {
     ch_arr.add(cfg.channelName(i));
   }
-
-  String json;
-  serializeJson(doc, json);
-  request->send(200, "application/json", json);
 }
 
 // POST /api/channel/<ch>/record/start
@@ -571,21 +680,9 @@ static void handleChannelRecordStart(AsyncWebServerRequest *request) {
 }
 
 // GET /api/channel/<ch>/record/all — all data from .dat + buffer
-static void handleChannelRecordAll(AsyncWebServerRequest *request) {
-  int ch = parseChannelFromUrl(request->url());
-  if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
-
-  // Pagination: offset = sample index (0-based, across file + ring buffer)
-  int offset = 0, limit = 300;
-  if (request->hasParam("offset")) offset = request->getParam("offset")->value().toInt();
-  if (request->hasParam("limit"))  limit  = request->getParam("limit")->value().toInt();
-  if (offset < 0) offset = 0;
-  if (limit < 1) limit = 1;
-  if (limit > 500) limit = 500;
-
+// Shared: fills a JsonArray with samples [offset, offset+limit)
+static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit) {
   auto &rec = DataRecorder::getInstance();
-  JsonDocument doc;
-  JsonArray arr = doc.to<JsonArray>();
 
   // Layout: [ file samples (n) ][ ring buffer samples (cnt) ]
   const char *fname = rec.currentFilename(ch);
@@ -631,6 +728,23 @@ static void handleChannelRecordAll(AsyncWebServerRequest *request) {
     o["W"] = b.power_W;
     o["C"] = b.channel_temp_C;
   }
+}
+
+static void handleChannelRecordAll(AsyncWebServerRequest *request) {
+  int ch = parseChannelFromUrl(request->url());
+  if (ch < 0 || ch > 3) { request->send(400, "application/json", "[]"); return; }
+
+  // Pagination: offset = sample index (0-based, across file + ring buffer)
+  int offset = 0, limit = 300;
+  if (request->hasParam("offset")) offset = request->getParam("offset")->value().toInt();
+  if (request->hasParam("limit"))  limit  = request->getParam("limit")->value().toInt();
+  if (offset < 0) offset = 0;
+  if (limit < 1) limit = 1;
+  if (limit > 500) limit = 500;
+
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
+  channelRecordAllToJson(arr, ch, offset, limit);
 
   String json;
   serializeJson(doc, json);

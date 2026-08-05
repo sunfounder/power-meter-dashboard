@@ -272,12 +272,10 @@ function connectWS(ip){
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
-  if(!ip){document.getElementById('connErr').textContent='Enter IP';return;}
-  document.getElementById('connErr').textContent='Connecting...';
-  fetch('http://'+ip+'/ping').then(r=>{
-    if(r.ok)setDevice(ip);
-    else document.getElementById('connErr').textContent='Not found';
-  }).catch(()=>{document.getElementById('connErr').textContent='Cannot reach '+ip;});
+  if(!ip){document.getElementById('connErr').textContent='输入 IP';return;}
+  // Straight to WebSocket — WS onopen/onclose determines connection state
+  document.getElementById('connErr').textContent='连接中...';
+  setDevice(ip);
 }
 function disconnect(){
   if(wsTimer)clearTimeout(wsTimer);
@@ -309,7 +307,7 @@ function saveStop(i){
   document.getElementById('siv'+i).classList.toggle('off',!vOn);
   document.getElementById('sim'+i).classList.toggle('off',!mAOn);
   document.getElementById('sid'+i).classList.toggle('off',!minOn);
-  api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall})});
+  wsSend({type:'cmd',cmd:'settings',stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall});
   toast('自动停止条件已保存 (CH'+(i+1)+')');
   applyStopUI(i);
 }
@@ -659,6 +657,11 @@ function uc(){
   }
 }
 
+// Send a command over WebSocket (primary control channel)
+function wsSend(obj){
+  if(ws&&ws.readyState===1){ws.send(JSON.stringify(obj));return true;}
+  return false;
+}
 function setRecBtns(i,state){
   // state: 0=REC, 1=STOP, 2=Reset+DL
   const ctrl=document.getElementById('rc'+i);
@@ -697,7 +700,7 @@ function tr(i){
       lastNZ[i]=[0,0,0,0];
     }
     document.getElementById('rn'+i).textContent=pfx[i];
-    api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
+    wsSend({type:'cmd',cmd:'record_start',ch:i,name:pfx[i]});
   }
   else if(recState[i]===1){ // RECORDING → STOP
     if(!confirm('确定停止录制 CH'+(i+1)+'?'))return;
@@ -705,15 +708,14 @@ function tr(i){
     document.getElementById('cr'+i).classList.remove('recording');
     document.getElementById('cr'+i).classList.add('stopped');
     setRecBtns(i,2);  // Reset + DL (recFiles filled below)
-    api('/api/channel/'+i+'/record/stop',{method:'POST'}).then(()=>{
-      // Fetch file list to find the newly created file
-      api('/api/files').then(d=>{
-        if(d&&d.length){
-          const latest=d[d.length-1]; // assume last file is ours
-          recFiles[i]=latest.name||'';
-          setRecBtns(i,2);  // refresh DL button with actual filename
-        }
-      });
+    wsSend({type:'cmd',cmd:'record_stop',ch:i});
+    // Fetch file list to find the newly created file
+    api('/api/files').then(d=>{
+      if(d&&d.length){
+        const latest=d[d.length-1]; // assume last file is ours
+        recFiles[i]=latest.name||'';
+        setRecBtns(i,2);  // refresh DL button with actual filename
+      }
     });
   }
   else if(recState[i]===2){ // STOPPED → RESET
@@ -769,9 +771,8 @@ function delSelected(){
   const cbs=document.querySelectorAll('.file-cb:checked');
   if(!cbs.length)return;
   if(!confirm('删除 '+cbs.length+' 个文件?'))return;
-  Promise.all(Array.from(cbs).map(cb=>
-    api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
-  )).then(()=>loadFiles());
+  cbs.forEach(cb=>wsSend({type:'cmd',cmd:'delete',file:cb.value}));
+  setTimeout(loadFiles,300);
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openSettings(){
@@ -790,7 +791,16 @@ function openSettings(){
     document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
   });
 }
-function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
+function saveSet(k,v){
+  const map={sample_ms:'sample_interval_ms',temp_unit:'temp_unit',tz_offset:'tz_offset',
+    wifi_ssid:'wifi_ssid',wifi_password:'wifi_password',dev_name:'device_name',
+    ap_password:'ap_password',amb_offset:'amb_temp_offset'};
+  const key=map[k]||k;
+  const obj={type:'cmd',cmd:'settings'};
+  obj[key]=(k==='sample_ms'||k==='tz_offset')?parseInt(v):(k==='amb_offset')?parseFloat(v):v;
+  wsSend(obj);
+  toast('设置已保存');
+}
 function saveXMin(v){localStorage.setItem('pm_xmin',v);}
 function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
 function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}

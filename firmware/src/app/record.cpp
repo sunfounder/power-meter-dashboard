@@ -3,6 +3,7 @@
 #include "../net/log.h"
 #include "../hal/buzzer.h"
 #include <time.h>
+#include <ArduinoJson.h>
 
 DataRecorder &DataRecorder::getInstance() {
   static DataRecorder instance;
@@ -241,6 +242,28 @@ void DataRecorder::listFiles() {
   File f = root.openNextFile();
   while (f) {
     Serial.printf("  %s (%d bytes)\n", f.name(), f.size());
+    f = root.openNextFile();
+  }
+  root.close();
+}
+
+// Fill a JsonArray with {name,size} for all .dat files (shared: HTTP + WS)
+void DataRecorder::listFilesToJson(JsonArray &arr) {
+  File root = LittleFS.open("/data");
+  if (!root || !root.isDirectory()) return;
+  File f = root.openNextFile();
+  while (f) {
+    String nm = String(f.name());
+    size_t sz = f.size();
+    f.close();
+    // Keep only .dat files (skip .csv/others if any)
+    if (nm.endsWith(".dat")) {
+      // Strip "/data/" prefix
+      const char *base = strrchr(nm.c_str(), '/');
+      JsonObject o = arr.add<JsonObject>();
+      o["name"] = base ? base + 1 : nm.c_str();
+      o["size"] = sz;
+    }
     f = root.openNextFile();
   }
   root.close();

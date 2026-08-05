@@ -180,7 +180,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
-    <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?'))api('/api/restart',{method:'POST'})">重启</button>
+    <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?')){wsSend({type:'cmd',cmd:'restart'});}">重启</button>
     <button class="btn-buzz" onclick="checkUpdate()" id="btnUpdate" style="width:100%;margin-top:4px">检查更新</button>
     <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
@@ -249,7 +249,7 @@ function setDevice(ip){
   build();
   connectWS(ip);
   // Fetch firmware version once
-  api('/api/settings').then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;});
+  wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;}).catch(()=>{});
 }
 // ── WebSocket primary data channel ──
 let ws=null, wsTimer=null, wsRetry=0;
@@ -259,6 +259,10 @@ function connectWS(ip){
   ws.onopen=()=>{document.getElementById('connDot').className='conn-dot';wsRetry=0;};
   ws.onmessage=e=>{
     let msg;try{msg=JSON.parse(e.data);}catch(_){return;}
+    if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
+      const p=wsPending[msg.req_id];delete wsPending[msg.req_id];
+      p.res(msg);return;
+    }
     if(msg.type==='measurement'){processData(msg.data);}
     else if(msg.type==='alarm')toast(msg.message);
   };
@@ -272,12 +276,10 @@ function connectWS(ip){
 }
 function doConnect(){
   const ip=document.getElementById('connIP').value.trim();
-  if(!ip){document.getElementById('connErr').textContent='Enter IP';return;}
-  document.getElementById('connErr').textContent='Connecting...';
-  fetch('http://'+ip+'/ping').then(r=>{
-    if(r.ok)setDevice(ip);
-    else document.getElementById('connErr').textContent='Not found';
-  }).catch(()=>{document.getElementById('connErr').textContent='Cannot reach '+ip;});
+  if(!ip){document.getElementById('connErr').textContent='输入 IP';return;}
+  // Straight to WebSocket — WS onopen/onclose determines connection state
+  document.getElementById('connErr').textContent='连接中...';
+  setDevice(ip);
 }
 function disconnect(){
   if(wsTimer)clearTimeout(wsTimer);
@@ -309,7 +311,7 @@ function saveStop(i){
   document.getElementById('siv'+i).classList.toggle('off',!vOn);
   document.getElementById('sim'+i).classList.toggle('off',!mAOn);
   document.getElementById('sid'+i).classList.toggle('off',!minOn);
-  api('/api/settings',{method:'POST',body:new URLSearchParams({stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall})});
+  wsSend({type:'cmd',cmd:'settings',stop_ch:i,stop_en:en,stop_v:v,stop_mA:(a*1000).toFixed(0),stop_min:Math.round(h*60),stop_fall:fall});
   toast('自动停止条件已保存 (CH'+(i+1)+')');
   applyStopUI(i);
 }
@@ -382,7 +384,7 @@ function applyStopUI(i){
   });
 }
 function loadStopConds(){
-  api('/api/settings').then(d=>{
+  wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{
     if(!d||!d.stop_cond)return;
     for(let i=0;i<4;i++){
       const sc=d.stop_cond[i];if(!sc)continue;
@@ -659,6 +661,22 @@ function uc(){
   }
 }
 
+// Send a command over WebSocket (primary control channel)
+function wsSend(obj){
+  if(ws&&ws.readyState===1){ws.send(JSON.stringify(obj));return true;}
+  return false;
+}
+// Promise-style WS request: {type:'cmd',cmd:...} → resolves with ack payload
+let wsReqId=0, wsPending={};
+function wsReq(obj,timeout){
+  return new Promise((res,rej)=>{
+    if(!ws||ws.readyState!==1){rej(new Error('ws closed'));return;}
+    const id=++wsReqId;
+    wsPending[id]={res,rej};
+    ws.send(JSON.stringify({...obj,req_id:id}));
+    setTimeout(()=>{if(wsPending[id]){delete wsPending[id];rej(new Error('ws timeout'));}},timeout||8000);
+  });
+}
 function setRecBtns(i,state){
   // state: 0=REC, 1=STOP, 2=Reset+DL
   const ctrl=document.getElementById('rc'+i);
@@ -697,7 +715,7 @@ function tr(i){
       lastNZ[i]=[0,0,0,0];
     }
     document.getElementById('rn'+i).textContent=pfx[i];
-    api('/api/channel/'+i+'/record/start',{method:'POST',body:new URLSearchParams({name:pfx[i]})});
+    wsSend({type:'cmd',cmd:'record_start',ch:i,name:pfx[i]});
   }
   else if(recState[i]===1){ // RECORDING → STOP
     if(!confirm('确定停止录制 CH'+(i+1)+'?'))return;
@@ -705,15 +723,15 @@ function tr(i){
     document.getElementById('cr'+i).classList.remove('recording');
     document.getElementById('cr'+i).classList.add('stopped');
     setRecBtns(i,2);  // Reset + DL (recFiles filled below)
-    api('/api/channel/'+i+'/record/stop',{method:'POST'}).then(()=>{
-      // Fetch file list to find the newly created file
-      api('/api/files').then(d=>{
-        if(d&&d.length){
-          const latest=d[d.length-1]; // assume last file is ours
-          recFiles[i]=latest.name||'';
-          setRecBtns(i,2);  // refresh DL button with actual filename
-        }
-      });
+    wsSend({type:'cmd',cmd:'record_stop',ch:i});
+    // Fetch file list to find the newly created file
+    wsReq({type:'cmd',cmd:'files'}).then(d=>{
+      const fl=d&&d.data?d.data:[];
+      if(fl.length){
+        const latest=fl[fl.length-1]; // assume last file is ours
+        recFiles[i]=latest.name||'';
+        setRecBtns(i,2);  // refresh DL button with actual filename
+      }
     });
   }
   else if(recState[i]===2){ // STOPPED → RESET
@@ -733,21 +751,22 @@ function openFiles(){document.getElementById('filesOverlay').classList.add('show
 let selectedFiles=[];
 
 function loadFiles(){
-  api('/api/files').then(d=>{
+  wsReq({type:'cmd',cmd:'files'}).then(d=>{
     const el=document.getElementById('fileList');
-    if(!d||!d.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
+    const fl=d&&d.data?d.data:[];
+    if(!fl.length){el.innerHTML='<span style="color:#555">无文件 (最大'+MAX_FILES+')</span>';}
     else{
-      let html='<span style="color:#555;font-size:10px">'+d.length+'/'+MAX_FILES+' 个文件</span>';
-      d.forEach(f=>{
+      let html='<span style="color:#555;font-size:10px">'+fl.length+'/'+MAX_FILES+' 个文件</span>';
+      fl.forEach(f=>{
         html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
           '<span class="fname" title="'+f.name+'">'+f.name.replace('.dat','')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
           '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="下载"><i class="fa fa-download"></i></a>'+
-          '<button class="btn-del" onclick="if(confirm(\'删除?\')){api(\'/api/delete?file='+encodeURIComponent(f.name)+'\',{method:\'POST\'}).then(r=>{if(r&&r.ok)loadFiles();})}" title="删除"><i class="fa fa-trash"></i></button></div>';
+          '<button class="btn-del" onclick="if(confirm(\'删除?\')){wsSend({type:\'cmd\',cmd:\'delete\',file:\''+f.name+'\'});setTimeout(loadFiles,300);}" title="删除"><i class="fa fa-trash"></i></button></div>';
       });
       el.innerHTML=html;
     }
-  });
-  api('/api/storage').then(s=>{
+  }).catch(()=>toast('获取文件列表失败'));
+  wsReq({type:'cmd',cmd:'storage'}).then(s=>{
     if(!s)return;
     const pct=Math.round(s.used_kb/s.total_kb*100);
     document.getElementById('storageBar').innerHTML=
@@ -769,28 +788,34 @@ function delSelected(){
   const cbs=document.querySelectorAll('.file-cb:checked');
   if(!cbs.length)return;
   if(!confirm('删除 '+cbs.length+' 个文件?'))return;
-  Promise.all(Array.from(cbs).map(cb=>
-    api('/api/delete?file='+encodeURIComponent(cb.value),{method:'POST'})
-  )).then(()=>loadFiles());
+  cbs.forEach(cb=>wsSend({type:'cmd',cmd:'delete',file:cb.value}));
+  setTimeout(loadFiles,300);
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openSettings(){
   document.getElementById('settingsOverlay').classList.add('show');
-  api('/api/settings').then(d=>{
-    console.log('settings response:',d);
+  wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{
     if(!d)return;
     document.getElementById('setDevName').value=d.device_name||'';
     document.getElementById('setWifiSSID').value=d.wifi_ssid||'';
     document.getElementById('setTz').value=d.tz_offset||8;
     // Highlight active toggle buttons
-    const r=parseInt(d.rotation)||0;
     document.getElementById('tuC').className='toggle-btn'+(d.temp_unit!='F'?' active':'');
     document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
     document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
     document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
-  });
+  }).catch(()=>toast('获取设置失败'));
 }
-function saveSet(k,v){api('/api/settings',{method:'POST',body:new URLSearchParams({[k]:v})});}
+function saveSet(k,v){
+  const map={sample_ms:'sample_interval_ms',temp_unit:'temp_unit',tz_offset:'tz_offset',
+    wifi_ssid:'wifi_ssid',wifi_password:'wifi_password',dev_name:'device_name',
+    ap_password:'ap_password',amb_offset:'amb_temp_offset'};
+  const key=map[k]||k;
+  const obj={type:'cmd',cmd:'settings'};
+  obj[key]=(k==='sample_ms'||k==='tz_offset')?parseInt(v):(k==='amb_offset')?parseFloat(v):v;
+  wsSend(obj);
+  toast('设置已保存');
+}
 function saveXMin(v){localStorage.setItem('pm_xmin',v);}
 function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
 function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
@@ -801,13 +826,13 @@ function calibrateAmbTemp(){
   if(isNaN(real)){toast('输入实际温度');return;}
   if(!lastData||lastData.ambient_temp_C==null){toast('无温度数据');return;}
   const offset=(real-lastData.ambient_temp_C).toFixed(1);
-  api('/api/settings',{method:'POST',body:new URLSearchParams({amb_temp_offset:offset})}).then(()=>{
-    toast('校准完成，偏移: '+offset+'°C');
-  });
+  wsSend({type:'cmd',cmd:'settings',amb_temp_offset:offset});
+  toast('校准完成，偏移: '+offset+'°C');
 }
 function saveWiFi(){
   const s=document.getElementById('setWifiSSID').value.trim(),p=document.getElementById('setWifiPass').value;
-  api('/api/wifi',{method:'POST',body:new URLSearchParams({ssid:s,password:p})}).then(d=>toast(d?d.message:'Done'));
+  wsSend({type:'cmd',cmd:'settings',wifi_ssid:s,wifi_password:p});
+  toast('WiFi 设置已保存');
 }
 function toast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
@@ -985,10 +1010,10 @@ async function loadBufferData(i){
   let all=[];
   let off=0;
   for(;;){
-    const d=await api('/api/channel/'+i+'/record/all?offset='+off+'&limit='+PAGE);
-    if(!d||!d.length)break;
-    all=all.concat(d);
-    if(d.length<PAGE)break;
+    const d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE});
+    if(!d||!d.data||!d.data.length)break;
+    all=all.concat(d.data);
+    if(d.data.length<PAGE)break;
     off+=PAGE;
   }
   if(!all.length)return;

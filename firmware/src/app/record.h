@@ -3,6 +3,7 @@
 #include "measure_types.h"
 #include <FS.h>
 #include <LittleFS.h>
+#include <ArduinoJson.h>
 
 /**
  * Data Recorder — binary storage (.dat files)
@@ -54,6 +55,8 @@ public:
   uint16_t bufferHead(int ch) const { return _buf_head[ch]; }
 
   void listFiles();
+  // Fill a JsonArray with {name,size} for all .dat files (shared: HTTP + WS)
+  void listFilesToJson(JsonArray &arr);
   size_t getFileSize(const char *path);
   bool deleteFile(const char *path);
 
