@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_sntp.h>
 #include <lvgl.h>
 
 #include "version.h"
@@ -236,7 +237,7 @@ void loop() {
     if (t < 1600000000) { // not synced yet
       int8_t tz = DeviceSettings::getInstance().tzOffset();
       ntpSync();
-      Serial.printf("[NTP] Retry sync (UTC%+d)\n", tz);
+      Serial.printf("[NTP] Retry sync (UTC%+d) sntp=%d\n", tz, (int)sntp_get_sync_status());
     } else if (!ntp_done) {
       ntp_done = true;
       struct tm *tm = localtime(&t);
