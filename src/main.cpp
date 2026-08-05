@@ -228,13 +228,19 @@ void loop() {
   checkAlarms();
 
   // NTP retry: if STA connected but time not synced, retry every 30s
+  // (China-friendly servers — pool.ntp.org is often unreachable domestically)
   if (now - last_ntp_check > 30000 && WiFi.status() == WL_CONNECTED) {
     last_ntp_check = now;
     time_t t = time(nullptr);
     if (t < 1600000000) { // not synced yet
       int8_t tz = DeviceSettings::getInstance().tzOffset();
-      configTime(tz * 3600, 0, "pool.ntp.org", "time.nist.gov");
+      configTime(tz * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
       Serial.printf("[NTP] Retry sync (UTC%+d)\n", tz);
+    } else {
+      struct tm *tm = localtime(&t);
+      Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d\n",
+                    tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
+                    tm->tm_hour, tm->tm_min, tm->tm_sec);
     }
   }
 
