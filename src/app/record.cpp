@@ -80,7 +80,6 @@ bool DataRecorder::_openFile(int ch, const char *testName) {
   if (ch < 0 || ch > 3) return false;
 
   _buildFilename(ch, testName, _filenames[ch], sizeof(_filenames[ch]));
-
   // Create empty .dat file (no header needed)
   if (!LittleFS.exists(_filenames[ch])) {
     File f = LittleFS.open(_filenames[ch], FILE_WRITE);
@@ -126,6 +125,9 @@ void DataRecorder::_flushBuffer(int ch) {
 bool DataRecorder::startChannel(int ch, const char *testName) {
   if (ch < 0 || ch > 3) return false;
   if (_states[ch].active) stopChannel(ch);
+
+  // Enforce max recorded files: delete oldest .dat before starting a new one
+  _enforceFileLimit();
 
   if (!_openFile(ch, testName)) return false;
 
@@ -254,4 +256,40 @@ size_t DataRecorder::getFileSize(const char *path) {
 bool DataRecorder::deleteFile(const char *path) {
   if (!LittleFS.exists(path)) return false;
   return LittleFS.remove(path);
+}
+
+// Keep at most MAX_REC_FILES .dat files: delete the oldest by name
+// (names embed YYYYMMDD_HHMMSS timestamps, so lexical order ≈ time order).
+void DataRecorder::_enforceFileLimit() {
+  File root = LittleFS.open(DATA_DIR);
+  if (!root || !root.isDirectory()) return;
+
+  const int MAX = 32;
+  char names[MAX][64];
+  int n = 0;
+  File f;
+  while ((f = root.openNextFile()) && n < MAX) {
+    String nm = String(f.name());
+    f.close();
+    if (nm.endsWith(".dat")) {
+      strncpy(names[n], nm.c_str(), 63);
+      names[n][63] = '\0';
+      n++;
+    }
+  }
+  root.close();
+
+  while (n > MAX_REC_FILES) {
+    // find lexicographically smallest (= oldest)
+    int min_i = 0;
+    for (int i = 1; i < n; i++) {
+      if (strcmp(names[i], names[min_i]) < 0) min_i = i;
+    }
+    if (LittleFS.remove(names[min_i])) {
+      Serial.printf("[DR] file limit: removed oldest %s\n", names[min_i]);
+    }
+    // shift
+    for (int i = min_i; i < n - 1; i++) strcpy(names[i], names[i + 1]);
+    n--;
+  }
 }

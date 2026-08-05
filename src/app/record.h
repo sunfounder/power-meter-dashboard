@@ -73,6 +73,8 @@ private:
   bool _openFile(int ch, const char *testName);
   void _buildFilename(int ch, const char *testName, char *out, size_t out_sz);
   void _flushBuffer(int ch);
+  void _enforceFileLimit();
+  static constexpr int MAX_REC_FILES = 10;
 
   static constexpr const char *DATA_DIR = "/data";
 };
