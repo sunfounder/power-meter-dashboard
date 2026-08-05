@@ -182,7 +182,8 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?')){wsSend({type:'cmd',cmd:'restart'});}">重启</button>
     <button class="btn-buzz" onclick="checkUpdate()" id="btnUpdate" style="width:100%;margin-top:4px">检查更新</button>
-    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button></div>
+    <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button>
+    <button class="btn-buzz" onclick="if(window.electron)window.electron.devtools()" style="width:100%;margin-top:4px">调试面板</button></div>
     <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6" id="fwVer">固件版本: --</div>
     <div style="text-align:center;font-size:12px;color:var(--dim)"><span id="dashVer"></span></div>
   </div>
@@ -1049,7 +1050,7 @@ async function loadBufferData(i){
   try{
   // Paginated fetch: pull all samples in pages (device can't
   // serialize a whole .dat to JSON at once without OOM)
-  const PAGE=500;
+  const PAGE=200;
   let all=[];
   let off=0;
   let pages=0;
@@ -1057,7 +1058,7 @@ async function loadBufferData(i){
     // Retry each page (AsyncTCP send queue can drop frames under broadcast)
     let d=null;
     for(let r=0;r<3&&!d;r++){
-      try{d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE},5000);}
+      try{d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE},12000);}
       catch(e){console.log('[HIST] ch'+i+' page '+off+' try '+r+' failed: '+e.message);}
     }
     if(!d||!d.data||!d.data.length){console.log('[HIST] ch'+i+' end at offset '+off);break;}

@@ -265,7 +265,6 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   for (int i = 0; i < 4; i++) {
     JsonObject ch = ch_arr.add<JsonObject>();
     channelToJson(ch, snap.channels[i]);
-    ch["name"]             = cfg.channelName(i);
   }
   data["env"]["ambient_temp_C"] = snap.env.ambient_temp_C;
 
@@ -365,14 +364,8 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         ack["ok"] = LittleFS.exists(path) ? LittleFS.remove(path) : false;
       } else ack["ok"] = false;
     } else if (cmd == "get_settings") {
-      JsonDocument sdoc;
-      settingsToJson(sdoc);
-      sdoc["type"] = "ack";
-      sdoc["cmd"] = "get_settings";
-      String sjson;
-      serializeJson(sdoc, sjson);
-      client->text(sjson);
-      return;  // already sent full ack
+      settingsToJson(ack);   // merge settings into the standard ack payload
+      ack["ok"] = true;
     } else if (cmd == "record_all") {
       int ch = doc["ch"] | -1;
       int offset = doc["offset"] | 0;
@@ -383,7 +376,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         if (limit < 1) limit = 1;
         if (limit > 500) limit = 500;
         // Pause broadcasts so this (large) response isn't stuck in the send queue
-        ws_send_busy_until = millis() + 2500;
+        ws_send_busy_until = millis() + 8000;
         JsonArray arr = ack["data"].to<JsonArray>();
         channelRecordAllToJson(arr, ch, offset, limit);
         ack["ok"] = true;
@@ -452,6 +445,8 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       ack["ok"] = false;
       ack["error"] = "unknown cmd";
     }
+    // Echo req_id so the client can match this ack to its pending request
+    ack["req_id"] = doc["req_id"] | 0;
     String ack_json;
     serializeJson(ack, ack_json);
     client->text(ack_json);

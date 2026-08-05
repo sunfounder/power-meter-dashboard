@@ -162,6 +162,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <button class="btn-icon" onclick="toggleHideCh()" id="btnHideCh" title="显示未连接通道"><i class="fa fa-eye-slash"></i></button>
     <button class="btn-icon" onclick="refreshAll()" title="刷新"><i class="fa fa-rotate"></i></button>
     <button class="btn-icon" onclick="window.open('docs.html')" title="API 文档" style="color:var(--accent)"><i class="fa fa-circle-info"></i></button>
+    <button class="btn-icon" onclick="if(window.electron)window.electron.devtools()" title="调试面板 (DevTools)"><i class="fa fa-bug"></i></button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.min()" title="最小化" style="padding:3px 6px">_</button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.max()" title="最大化" style="padding:3px 6px">□</button>
     <button class="btn-icon win-ctrl" onclick="window.electron?.close()" title="关闭" style="padding:3px 6px">✕</button>
@@ -287,9 +288,8 @@ function connectWS(ip){
     let msg;try{msg=JSON.parse(e.data);}catch(_){console.log('[WS] BAD JSON frame len='+e.data.length+' head='+String(e.data).slice(0,80));return;}
     if(msg.type==='measurement'){
       const chs=msg.data&&msg.data.channels?msg.data.channels:[];
-      const amb=msg.data&&msg.data.env?msg.data.env.ambient_temp_C:'?';
       const rec=msg.data&&msg.data.recording?msg.data.recording.map(r=>r&&r.active?'R':'-').join(''):'?';
-      console.log('[WS] measurement ch='+chs.map(c=>c&&c.connected?'1':'0').join('')+' amb='+amb+' rec='+rec);
+      console.log('[WS] m ch='+chs.map(c=>c&&c.connected?'1':'0').join('')+' rec='+rec);
     }
     else if(msg.type==='ack')console.log('[WS] ack',msg.cmd,msg.ok);
     else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
