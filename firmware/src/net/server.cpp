@@ -387,11 +387,9 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       rec.listFilesToJson(arr);
       ack["ok"] = true;
     } else if (cmd == "storage") {
-      FSInfo64 info;
-      LittleFS.info(info);
-      ack["total_kb"] = info.totalBytes / 1024;
-      ack["used_kb"]  = info.usedBytes / 1024;
-      ack["free_kb"]  = (info.totalBytes - info.usedBytes) / 1024;
+      ack["total_kb"] = LittleFS.totalBytes() / 1024;
+      ack["used_kb"]  = LittleFS.usedBytes() / 1024;
+      ack["free_kb"]  = (LittleFS.totalBytes() - LittleFS.usedBytes()) / 1024;
       ack["ok"] = true;
     } else if (cmd == "restart") {
       ack["ok"] = true;
