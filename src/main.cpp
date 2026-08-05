@@ -234,7 +234,7 @@ void loop() {
     time_t t = time(nullptr);
     if (t < 1600000000) { // not synced yet
       int8_t tz = DeviceSettings::getInstance().tzOffset();
-      configTime(tz * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
+      ntpSync();
       Serial.printf("[NTP] Retry sync (UTC%+d)\n", tz);
     } else {
       struct tm *tm = localtime(&t);

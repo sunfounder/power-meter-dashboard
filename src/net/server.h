@@ -13,6 +13,9 @@
  * - Settings persistence via NVS
  */
 
+// NTP sync with China-friendly servers, using configured tz offset
+void ntpSync();
+
 class PowerMeterWebServer {
 public:
   static PowerMeterWebServer &getInstance();

@@ -108,13 +108,19 @@ void PowerMeterWebServer::update() {
   if (WiFi.status() == WL_CONNECTED) {
     if (_sta_retry_count > 0) { // Just connected
       int8_t tz = DeviceSettings::getInstance().tzOffset();
-      configTime(tz * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
+      ntpSync();
       Serial.printf("[WS] NTP sync started (UTC%+d)\n", tz);
       Serial.printf("[WS] STA connected! IP: %s\n", WiFi.localIP().toString().c_str());
     }
     _sta_retry_count = 0;
     _sta_gave_up = false;
   }
+}
+
+// NTP sync with China-friendly servers, using configured tz offset
+void ntpSync() {
+  int8_t tz = DeviceSettings::getInstance().tzOffset();
+  ntpSync();
 }
 
 void PowerMeterWebServer::startAP() {
@@ -199,7 +205,7 @@ void PowerMeterWebServer::startSTA(const char *ssid, const char *password) {
 
   if (WiFi.status() == WL_CONNECTED) {
     // Sync NTP time (use configured tz offset)
-    configTime(DeviceSettings::getInstance().tzOffset() * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
+    ntpSync();
     Serial.println("[WS] NTP time sync started");
     WebLog::getInstance().log("STA connected: %s IP=%s", ssid, WiFi.localIP().toString().c_str());
 
@@ -831,7 +837,7 @@ static void handleWifiConfig(AsyncWebServerRequest *request) {
 
   JsonDocument doc;
   if (WiFi.status() == WL_CONNECTED) {
-    configTime(DeviceSettings::getInstance().tzOffset() * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
+    ntpSync();
     doc["ok"] = true;
     doc["ip"] = WiFi.localIP().toString();
     doc["message"] = "Connected";
