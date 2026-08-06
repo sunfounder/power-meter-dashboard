@@ -567,6 +567,12 @@ function ic(i){
     ],animation:false,progressive:200,progressiveThreshold:500});
   // Chart click → highlight matching table row
   c.on('click',p=>{ if(p&&p.dataIndex!=null)selChart(i,p.dataIndex); });
+  // Auto-resize when the container size changes (window maximize is async —
+  // without this the canvas stays 0×0 until a manual resize)
+  if(window.ResizeObserver){
+    const ro=new ResizeObserver(()=>{if(charts[i])charts[i].resize();});
+    ro.observe(d);
+  }
 }
 
 // Process one measurement payload (from WebSocket)
@@ -1156,6 +1162,10 @@ async function loadBufferData(i, offset){
   if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
   streamChunks=[];streamActive=true;streamChan=i;
   streamGot[i]=offset||0;
+  // History stream is authoritative: clear idle preview + dedupe state
+  maxTs[i]=0;firstTs[i]=0;seq[i]=0;
+  if(charts[i])charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
+    xAxis:{min:null,max:null}},{notMerge:false});
   try{
     const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]},5000);
     if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
