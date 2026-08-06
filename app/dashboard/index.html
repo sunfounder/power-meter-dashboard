@@ -555,16 +555,16 @@ function ic(i){
       {type:'value',splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
-      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
+      {name:'V',type:'line',large:true,largeThreshold:500,yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
         areaStyle:{color:C[0],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
+      {name:'A',type:'line',large:true,largeThreshold:500,yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
         areaStyle:{color:C[1],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
+      {name:'W',type:'line',large:true,largeThreshold:500,yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
         areaStyle:{color:C[2],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none',areaStyle:{color:C[3],opacity:0.12}}
+      {name:'C',type:'line',large:true,largeThreshold:500,yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none',areaStyle:{color:C[3],opacity:0.12}}
     ],animation:false,progressive:200,progressiveThreshold:500});
   // Chart click → highlight matching table row
   c.on('click',p=>{ if(p&&p.dataIndex!=null)selChart(i,p.dataIndex); });
@@ -1185,10 +1185,12 @@ async function loadBufferData(i, offset){
   if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
   streamChunks=[];streamActive=true;streamChan=i;
   streamGot[i]=offset||0;
-  // History stream is authoritative: clear idle preview + dedupe state
-  maxTs[i]=0;firstTs[i]=0;seq[i]=0;
-  if(charts[i])charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
-    xAxis:{min:null,max:null}},{notMerge:false});
+  if(!offset){
+    // Fresh load: history stream is authoritative — clear idle preview + dedupe state
+    maxTs[i]=0;firstTs[i]=0;seq[i]=0;
+    if(charts[i])charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
+      xAxis:{min:null,max:null}},{notMerge:false});
+  }
   try{
     const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]},5000);
     if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
