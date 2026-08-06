@@ -764,14 +764,10 @@ function uc(){
         if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
         pts.push(v||0);
       }
-      const rawTs=lastData.timestamp||0;
-      let idx;
-      if(rawTs<1000000000){  // NTP unsynced: browser-clock anchor like history
-        if(!timeDecided[i]){timeDecided[i]=true;fakeAnchor[i]=Math.floor(Date.now()/1000);}
-        idx=fakeAnchor[i]+seq[i]++;
-      }else{
-        idx=rawTs;
-      }
+      const idx=lastData.timestamp||0;
+      if(idx<1000000000)continue;  // device clock unsynced — wait for NTP, skip live push
+      if(idx<=maxTs[i])continue;   // stale broadcast (history already drawn) — skip
+      maxTs[i]=idx;
       const opts={series:[]};
       for(let m=0;m<4;m++){
         const data=[...c.getOption().series[m].data];
@@ -1218,35 +1214,27 @@ function appendStreamChunk(buf){
     if(!histQueue[i])histQueue[i]=[];
     for(let o=0;o<n;o++){
       const b=o*24;
-      const ts=v.getUint32(b,true);  // real epoch seconds (may be 0 if NTP unsynced)
-      let x;
-      if(ts<1000000000){
-        // NTP unsynced: anchor to the browser clock (first sample ≈ now), +1s per sample.
-        // Keeps a real-looking clock axis even for fake timestamps, continuous if NTP syncs mid-recording.
-        if(!timeDecided[i]){timeDecided[i]=true;fakeAnchor[i]=Math.floor(Date.now()/1000);}
-        x=fakeAnchor[i]+seq[i]++;
-      }else{
-        if(ts<=maxTs[i])continue;  // already drawn (resume) — skip
-        maxTs[i]=ts;
-        x=ts;
-        // Pin X axis start at the recording start time
-        if(firstTs[i]===0){
-          firstTs[i]=ts;
-          const nowTs=Math.floor(Date.now()/1000);
-          const ch=lastData&&lastData.channels[i];
-          setTimeout(()=>{
-            const c=charts[i];if(!c)return;
-            const opt={xAxis:{min:ts,max:Math.max(nowTs,ts+1)}};
-            if(ch&&ch.connected){
-              const ys=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
-              opt.series=[0,1,2,3].map(m=>({markPoint:{symbol:'circle',symbolSize:6,
-                itemStyle:{color:C[m]},label:{show:false},data:[{coord:[nowTs,disp(ys[m],i)]}]}}));
-            }
-            c.setOption(opt,{notMerge:false});
-          },0);
-        }
+      const ts=v.getUint32(b,true);  // real epoch seconds
+      if(ts<1000000000)continue;  // NTP-unsynced garbage — skip, use real timestamps only
+      if(ts<=maxTs[i])continue;   // already drawn (resume) — skip
+      maxTs[i]=ts;
+      // Pin X axis start at the recording start time
+      if(firstTs[i]===0){
+        firstTs[i]=ts;
+        const nowTs=Math.floor(Date.now()/1000);
+        const ch=lastData&&lastData.channels[i];
+        setTimeout(()=>{
+          const c=charts[i];if(!c)return;
+          const opt={xAxis:{min:ts,max:Math.max(nowTs,ts+1)}};
+          if(ch&&ch.connected){
+            const ys=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
+            opt.series=[0,1,2,3].map(m=>({markPoint:{symbol:'circle',symbolSize:6,
+              itemStyle:{color:C[m]},label:{show:false},data:[{coord:[nowTs,disp(ys[m],i)]}]}}));
+          }
+          c.setOption(opt,{notMerge:false});
+        },0);
       }
-      histQueue[i].push({ts:x,vals:[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)]});
+      histQueue[i].push({ts,vals:[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)]});
     }
   }catch(e){console.log('[HIST] append err:',e.message);}
 }
