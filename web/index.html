@@ -761,6 +761,10 @@ function uc(){
         // Keep a sliding window (~1h @1s) so idle preview doesn't grow forever
         if(data.length>3600)data.splice(0,data.length-3600);
         opts.series.push({data});
+        if(m===0&&recState[i]===0&&(data.length%50===0)){  // idle-preview heartbeat (diagnostic)
+          const ax=c.getOption().xAxis[0];
+          console.log('[UC] idle ch'+i+' pts='+data.length+' xMin='+ax.min+' xMax='+ax.max);
+        }
       }
       c.setOption(opts,{notMerge:false});
     }catch(e){console.log('[UC] ch'+i+' err:',e.message);}
@@ -807,7 +811,7 @@ function resetCh(i){
   dataStore[i]=[];
   recFiles[i]='';
   if(charts[i])charts[i].setOption({series:[{data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}},
-    {data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}}],xAxis:{min:null,max:null}});
+    {data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}}],xAxis:{min:null,max:null}},{notMerge:false});
   setRecBtns(i,0);
   const btn=document.getElementById('cb'+i);
   if(btn&&lastData){const ok=lastData.channels[i].connected;btn.disabled=!ok;btn.style.opacity=ok?'':'0.35';}
