@@ -282,7 +282,21 @@ function connectWS(ip){
   ws.onmessage=e=>{
     if(e.data instanceof ArrayBuffer){
       // Binary frame: history stream chunk or .dat download chunk
-      if(streamActive){streamChunks.push(new Uint8Array(e.data));appendStreamChunk(e.data);}
+      if(streamActive){
+        streamChunks.push(new Uint8Array(e.data));
+        appendStreamChunk(e.data);
+        // reset stall watchdog on every chunk
+        if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
+        streamWatch=setTimeout(()=>{
+          streamWatch=null;
+          if(streamActive){
+            console.log('[STREAM] stalled 3s — restarting stream');
+            const ci=streamChan;
+            streamActive=false;streamChan=-1;
+            loadBufferData(ci);  // retry
+          }
+        },3000);
+      }
       else if(dlActive){dlChunks.push(new Uint8Array(e.data));}
       return;
     }
@@ -324,6 +338,7 @@ function connectWS(ip){
         if(typeof updateTables==='function')updateTables();
       }
       streamActive=false;streamChan=-1;streamChunks=[];
+      if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
       window.dispatchEvent(new Event('stream-done'));
       return;
     }
@@ -1049,7 +1064,7 @@ if(window.electron){
 // ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
 // History stream state (binary chunks from device until stream_done)
-let streamActive=false, streamChunks=[], streamChan=-1;
+let streamActive=false, streamChunks=[], streamChan=-1, streamWatch=null;
 let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
   if(dlActive){toast('已有下载进行中');return;}
