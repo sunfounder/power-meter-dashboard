@@ -285,8 +285,11 @@ function connectWS(ip){
     if(e.data instanceof ArrayBuffer){
       // Binary frame: history stream chunk or .dat download chunk
       if(streamActive){
+        const t0=performance.now();
         streamChunks.push(new Uint8Array(e.data));
         appendStreamChunk(e.data);
+        const dt=performance.now()-t0;
+        if(streamGot[streamChan]%500<50)console.log('[STREAM] chunk +'+e.data.byteLength+'B parsed='+dt.toFixed(1)+'ms got='+streamGot[streamChan]);
         // reset stall watchdog on every chunk
         if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
         streamWatch=setTimeout(()=>{
@@ -1217,7 +1220,10 @@ const HIST_BATCH_MS=150;   // redraw cadence (≈6.7 redraws/s per channel)
 const HIST_BATCH_N=25;     // samples per channel per redraw
 
 // Slow-draw loop: queue fills fast from WS, chart grows smoothly.
+let histLogAt=0;
 setInterval(()=>{
+  const t0=performance.now();
+  let drew=0;
   for(let i=0;i<4;i++){
     const q=histQueue[i];
     if(!q||!q.length)continue;
@@ -1230,6 +1236,11 @@ setInterval(()=>{
     const opts={series:[]};
     for(let m=0;m<4;m++)opts.series.push({data:histData[i][m]});
     c.setOption(opts,{notMerge:false});
+    drew+=batch.length;
+  }
+  const dt=performance.now()-t0;
+  if(drew&&(histLogAt++%10===0)){
+    console.log('[DRAW] pts='+drew+' time='+dt.toFixed(1)+'ms q='+histQueue.map(q=>q?q.length:0).join('/')+' hist='+histData.map(d=>d?d[0].length:0).join('/'));
   }
 },HIST_BATCH_MS);
 
