@@ -293,7 +293,7 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
-    _ws.getClient(s_stream_client)->binary((uint8_t *)chunk, n * sizeof(SampleBin));
+    _ws.client(s_stream_client)->binary((uint8_t *)chunk, n * sizeof(SampleBin));
     return;
   }
 
@@ -304,7 +304,7 @@ void PowerMeterWebServer::streamTick() {
   done["total"] = s_stream_total;
   String j;
   serializeJson(done, j);
-  _ws.getClient(s_stream_client)->text(j);
+  _ws.client(s_stream_client)->text(j);
   ws_send_busy_until = 0;  // resume broadcasts
   s_stream_ch = -1;
   Serial.printf("[STREAM] ch%d done, %u samples\n", s_stream_ch, s_stream_total);
