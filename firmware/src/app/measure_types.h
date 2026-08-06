@@ -37,6 +37,7 @@ struct MeasurementSnapshot {
 struct ChannelRecordingState {
   char name[48];            // User-defined test name
   uint32_t start_time;      // millis when recording started
+  uint32_t start_ts;        // epoch seconds when recording started (NTP time)
   bool active;              // Is this channel recording?
   uint32_t sample_count;    // Number of samples recorded
   char last_file[64];       // last recorded filename ('' if none)

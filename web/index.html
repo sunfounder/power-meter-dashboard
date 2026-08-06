@@ -282,8 +282,8 @@ function connectWS(ip){
   ws.onmessage=e=>{
     if(e.data instanceof ArrayBuffer){
       // Binary frame: history stream chunk or .dat download chunk
-      if(streamActive){console.log('[STREAM] +'+e.data.byteLength+'B');streamChunks.push(new Uint8Array(e.data));}
-      else if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
+      if(streamActive){streamChunks.push(new Uint8Array(e.data));appendStreamChunk(e.data);}
+      else if(dlActive){dlChunks.push(new Uint8Array(e.data));}
       return;
     }
     let msg;try{msg=JSON.parse(e.data);}catch(_){console.log('[WS] BAD JSON frame len='+e.data.length+' head='+String(e.data).slice(0,80));return;}
@@ -295,7 +295,38 @@ function connectWS(ip){
     else if(msg.type==='ack')console.log('[WS] ack',msg.cmd,msg.ok);
     else if(msg.type==='stream_done')console.log('[STREAM] done total='+msg.total);
     else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
-    if(msg.type==='stream_done'){window.dispatchEvent(new Event('stream-done'));return;}
+    if(msg.type==='stream_done'){
+      console.log('[STREAM] done total='+msg.total);
+      // Flush any pending batch to the chart
+      const fi=streamChan;
+      if(fi>=0&&histPend[fi]>0&&charts[fi]&&histData[fi]){
+        histPend[fi]=0;
+        const opts={series:[]};
+        for(let m=0;m<4;m++)opts.series.push({data:histData[fi][m]});
+        charts[fi].setOption(opts,{notMerge:false});
+      }
+      // Live chart continues from the end of history
+      if(fi>=0)sampleCount[fi]=streamIdx[fi];
+      // Assemble the detail-table data store from all received chunks
+      const i=streamChan;
+      const total=streamChunks.reduce((n,c)=>n+c.length,0);
+      if(i>=0&&total){
+        const u8=new Uint8Array(total);let off=0;
+        for(const c of streamChunks){u8.set(c,off);off+=c.length;}
+        const v=new DataView(u8.buffer);
+        const fmtClock=ts=>{const d=new Date(ts*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
+        dataStore[i]=[];
+        for(let o=0;o+24<=total;o+=24){
+          const ts=v.getUint32(o,true);
+          dataStore[i].push({t:fmtClock(ts),V:v.getFloat32(o+4,true),A:v.getFloat32(o+8,true),
+                             W:v.getFloat32(o+12,true),C:v.getFloat32(o+16,true)});
+        }
+        if(typeof updateTables==='function')updateTables();
+      }
+      streamActive=false;streamChan=-1;streamChunks=[];
+      window.dispatchEvent(new Event('stream-done'));
+      return;
+    }
     if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
     if(msg.type==='dl_fail'){window.dispatchEvent(new CustomEvent('dl-fail',{detail:msg.error}));return;}
     if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
@@ -471,12 +502,13 @@ function ic(i){
     legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true,formatter:params=>{
-      let t='';const v=params[0].value[0];const m=Math.floor(v/60);const s=v%60;t=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+'<br/>';
+      let t='';const d=new Date(params[0].value[0]*1000);
+      t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)+'<br/>';
       params.forEach(p=>{t+=p.marker+' '+p.seriesName+': '+p.value[1].toFixed(3)+'<br/>';});
       return t;
     }},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',min:0,splitLine:{show:true,lineStyle:{color:TC('border2'),width:0.5}},axisLabel:{color:TC('grid'),fontSize:8,formatter:v=>{const m=Math.floor(v/60);const s=v%60;return m+':'+('0'+s).slice(-2);}}},
+    xAxis:{type:'value',splitLine:{show:true,lineStyle:{color:TC('border2'),width:0.5}},axisLabel:{color:TC('grid'),fontSize:8,formatter:v=>{const d=new Date(v*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}}},
     yAxis:[
       // abs mode: 0 at bottom (positive data only); signed mode: symmetric, 0 centered
       {type:'value',min:v=>absMode[i]?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{show:false},axisLabel:{show:false},splitArea:{show:false}},
@@ -668,7 +700,8 @@ function up(){
     document.getElementById('ct'+i).textContent=r.elapsed||'00:00';
     const ch=chs[i];
     if(ch&&ch.connected){
-      dataStore[i].push({t:r.elapsed,V:ch.bus_voltage_V,A:ch.current_mA/1000,W:(ch.power_mW||0)/1000,C:ch.channel_temp_C});
+      const fmtClock=ts=>{const d=new Date((ts||0)*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
+      dataStore[i].push({t:fmtClock(d.timestamp),V:ch.bus_voltage_V,A:ch.current_mA/1000,W:(ch.power_mW||0)/1000,C:ch.channel_temp_C});
     }
   }
 }
@@ -677,6 +710,8 @@ function uc(){
   if(!lastData)return;
   for(let i=0;i<4;i++){
     try{
+      // While the history stream fills this channel's chart, skip live push
+      if(streamActive&&streamChan===i)continue;
       const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
       const c=charts[i];if(!c){console.log('[UC] ch'+i+' chart null');continue;}
       if(recState[i]!==1)continue;
@@ -687,7 +722,7 @@ function uc(){
         if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
         pts.push(v||0);
       }
-      const idx=sampleCount[i]++;
+      const idx=lastData.timestamp||sampleCount[i]++;  // real epoch seconds
       const opts={series:[]};
       for(let m=0;m<4;m++){
         const data=[...c.getOption().series[m].data];
@@ -1014,7 +1049,7 @@ if(window.electron){
 // ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
 // History stream state (binary chunks from device until stream_done)
-let streamActive=false, streamChunks=[];
+let streamActive=false, streamChunks=[], streamChan=-1;
 let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
   if(dlActive){toast('已有下载进行中');return;}
@@ -1053,50 +1088,61 @@ async function downloadCSVFile(fname){
   URL.revokeObjectURL(a.href);
 }
 
-// ── Pull buffered data to fill chart after page refresh (streaming) ──
+// ── Start history stream: chunks are appended to the chart as they arrive ──
 async function loadBufferData(i){
-  const ld=document.getElementById('cload'+i);
-  if(ld)ld.style.display='flex';
+  if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
+  streamChunks=[];streamActive=true;streamChan=i;
   try{
-    streamChunks=[];streamActive=true;
     const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i},5000);
-    if(!ack||!ack.ok){streamActive=false;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
-    // Wait until device pushes all chunks then stream_done
-    await new Promise((res,rej)=>{
-      const t=setTimeout(()=>{streamActive=false;rej(new Error('stream timeout'));},30000);
-      window.addEventListener('stream-done',()=>{clearTimeout(t);streamActive=false;res();},{once:true});
-    });
-    const total=streamChunks.reduce((n,c)=>n+c.length,0);
-    if(!total){console.log('[HIST] ch'+i+' empty stream');return;}
-    const u8=new Uint8Array(total);let off=0;
-    for(const c of streamChunks){u8.set(c,off);off+=c.length;}
-    const v=new DataView(u8.buffer);
-    const all=[];
-    for(let o=0;o+24<=total;o+=24){
-      all.push({t:v.getUint32(o,true),V:v.getFloat32(o+4,true),A:v.getFloat32(o+8,true),
-                W:v.getFloat32(o+12,true),C:v.getFloat32(o+16,true)});
+    if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
+    // X axis starts at the recording start time (skip if NTP wasn't synced)
+    if(ack.start_ts>1000000000){
+      setTimeout(()=>{const c=charts[i];if(c)c.setOption({xAxis:{min:ack.start_ts}},{notMerge:false});},50);
     }
-    console.log('[HIST] ch'+i+' pulled '+all.length+' samples');
-    if(!all.length)return;
-    const c=charts[i];if(!c){console.log('[HIST] ch'+i+' chart missing');return;}
-    sampleCount[i]=Math.max(sampleCount[i]||0,all.length);
-    const firstT=all[0].t||0;
-    const fmtRel=sec=>{const s=Math.max(0,Math.floor(sec));return (Math.floor(s/60)<10?'0':'')+Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);};
-    dataStore[i]=all.map(p=>({t:fmtRel((p.t||0)-firstT),V:p.V,A:p.A,W:p.W,C:p.C}));
-    const opts={series:[]};
-    for(let m=0;m<4;m++){
-      const key=['V','A','W','C'][m];
-      const data=all.map((p,j)=>[j,disp(parseFloat(p[key])||0,i)]);
-      opts.series.push({data});
-    }
-    c.setOption(opts,{notMerge:false});
-    console.log('[HIST] ch'+i+' chart drawn');
+    setTimeout(()=>{if(charts[i])charts[i].resize();},50);  // canvas size before appending
   }catch(e){
-    console.log('[HIST] ch'+i+' error:',e.message);
-  }finally{
-    streamActive=false;
-    if(ld)ld.style.display='none';
+    streamActive=false;streamChan=-1;
+    console.log('[HIST] ch'+i+' stream_start error:',e.message);
   }
+  // No spinner: chart fills progressively via appendStreamChunk()
+}
+
+// History series data kept client-side; redraw in batches (appendData proved
+// unreliable in this Electron/echarts combination)
+let histData=[null,null,null,null];
+let histPend=[0,0,0,0];
+let streamIdx=[0,0,0,0];  // streaming X counter (starts at 0 per channel)
+let firstTs=[0,0,0,0];    // first sample epoch per channel (X axis min)
+const HIST_BATCH=3;  // redraw every N chunks
+
+// Append one binary chunk to the chart (called from onmessage)
+function appendStreamChunk(buf){
+  try{
+    const i=streamChan;if(i<0)return;
+    const c=charts[i];if(!c)return;
+    const u8=new Uint8Array(buf);
+    const v=new DataView(u8.buffer);
+    const n=Math.floor(u8.byteLength/24);
+    if(!n)return;
+    if(!histData[i])histData[i]=[[],[],[],[]];
+    for(let o=0;o<n;o++){
+      const b=o*24;
+      const ts=v.getUint32(b,true);  // real epoch seconds
+      // First sample of the recording → use it as the X axis start time
+      if(firstTs[i]===0&&ts>1000000000){
+        firstTs[i]=ts;
+        setTimeout(()=>{const c=charts[i];if(c)c.setOption({xAxis:{min:ts}},{notMerge:false});},0);
+      }
+      const vals=[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)];
+      for(let m=0;m<4;m++)histData[i][m].push([ts,disp(vals[m],i)]);
+    }
+    if(++histPend[i]>=HIST_BATCH){
+      histPend[i]=0;
+      const opts={series:[]};
+      for(let m=0;m<4;m++)opts.series.push({data:histData[i][m]});
+      c.setOption(opts,{notMerge:false});
+    }
+  }catch(e){console.log('[HIST] append err:',e.message);}
 }
 </script>
 </body>

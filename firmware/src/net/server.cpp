@@ -517,6 +517,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         }
         ack["ok"] = ok;
         ack["total"] = ok ? s_stream_total : 0;
+        ack["start_ts"] = ok ? (uint32_t)rec.channelState(ch).start_ts : 0;
       }
     } else if (cmd == "settings") {
       // Same params as POST /api/settings

@@ -137,6 +137,7 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
   strncpy(_states[ch].name, testName, sizeof(_states[ch].name) - 1);
   _states[ch].name[sizeof(_states[ch].name) - 1] = '\0';
   _states[ch].start_time = millis();
+  _states[ch].start_ts   = (uint32_t)time(nullptr);  // epoch sec (NTP); may be small if unsynced
   _states[ch].active = true;
   _states[ch].sample_count = 0;
   _states[ch].last_file[0] = '\0';
