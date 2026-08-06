@@ -19,6 +19,7 @@ static lv_obj_t *_ambient_label = nullptr;
 static lv_obj_t *_time_label = nullptr;
 static lv_obj_t *_wifi_ssid_label = nullptr;
 static lv_obj_t *_wifi_ip_label = nullptr;
+static lv_obj_t *_wifi_rssi_label = nullptr;
 
 // Scope mode
 static lv_obj_t *_scope_page = nullptr;
@@ -185,9 +186,16 @@ static void refresh_status_bar() {
   if (WiFi.status() == WL_CONNECTED) {
     lv_label_set_text(_wifi_ssid_label, WiFi.SSID().c_str());
     lv_label_set_text(_wifi_ip_label, WiFi.localIP().toString().c_str());
+    // WiFi signal icon colored by RSSI
+    int rssi = WiFi.RSSI();
+    uint32_t color = rssi >= -60 ? 0x3CB84C : rssi >= -75 ? 0xE6C800 : rssi >= -90 ? 0xE27005 : 0xE02F2F;
+    lv_obj_set_style_text_color(_wifi_rssi_label, lv_color_hex(color), 0);
+    lv_label_set_text(_wifi_rssi_label, LV_SYMBOL_WIFI);
   } else {
     lv_label_set_text(_wifi_ssid_label, WiFi.softAPSSID().c_str());
     lv_label_set_text(_wifi_ip_label, WiFi.softAPIP().toString().c_str());
+    lv_obj_set_style_text_color(_wifi_rssi_label, lv_color_hex(0x555555), 0);
+    lv_label_set_text(_wifi_rssi_label, LV_SYMBOL_WIFI);
   }
 }
 
@@ -263,6 +271,13 @@ void power_meter_init() {
   lv_obj_set_style_text_font(_wifi_ip_label, &lv_font_montserrat_14, 0);
   lv_obj_align(_wifi_ip_label, LV_ALIGN_RIGHT_MID, -4, 0);
 
+  // WiFi signal icon (LV_SYMBOL_WIFI) between SSID and IP, colored by RSSI
+  _wifi_rssi_label = lv_label_create(wifi_bar);
+  lv_label_set_text(_wifi_rssi_label, LV_SYMBOL_WIFI);
+  lv_obj_set_style_text_color(_wifi_rssi_label, lv_color_hex(0x777777), 0);
+  lv_obj_set_style_text_font(_wifi_rssi_label, &lv_font_montserrat_14, 0);
+  lv_obj_align(_wifi_rssi_label, LV_ALIGN_CENTER, 0, 0);
+
   // ---- Cards: fill from y=22 to y=148 ----
   const int card_y = 22;
   const int card_h = 148 - card_y;  // = 126
@@ -301,6 +316,7 @@ void power_meter_hide() {
   _time_label = nullptr;
   _wifi_ssid_label = nullptr;
   _wifi_ip_label = nullptr;
+  _wifi_rssi_label = nullptr;
   for (int i = 0; i < 4; i++) _conn_bars[i] = nullptr;
 }
 
