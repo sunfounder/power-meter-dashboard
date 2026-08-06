@@ -474,6 +474,15 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       r["samples"] = recorder.channelState(i).sample_count;
     r["last_file"] = recorder.channelState(i).last_file;
     }
+    // Crash-recovery: interrupted recordings detected at boot
+    char incompl[4][64];
+    recorder.findIncomplete(incompl);
+    JsonArray inc_arr = doc["incomplete"].to<JsonArray>();
+    for (int i = 0; i < 4; i++) {
+      JsonObject o = inc_arr.add<JsonObject>();
+      o["ch"] = i;
+      o["file"] = incompl[i][0] ? incompl[i] : "";
+    }
     String json;
     serializeJson(doc, json);
     client->text(json);
@@ -499,11 +508,17 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     if (cmd == "record_start") {
       int ch = doc["ch"] | -1;
       String name = doc["name"] | "test";
+      String resume = doc["resume_file"] | "";
       if (ch >= 0 && ch <= 3) {
         auto &rec = DataRecorder::getInstance();
-        if (rec.isChannelRecording(ch)) rec.renameCurrent(ch, name.c_str());
-        else ack["ok"] = rec.startChannel(ch, name.c_str());
-        ack["ok"] = true;
+        if (rec.isChannelRecording(ch)) {
+          rec.renameCurrent(ch, name.c_str());
+          ack["ok"] = true;
+        } else if (resume.length()) {
+          ack["ok"] = rec.resumeChannel(ch, name.c_str(), resume.c_str());
+        } else {
+          ack["ok"] = rec.startChannel(ch, name.c_str());
+        }
       } else ack["ok"] = false;
     } else if (cmd == "record_stop") {
       int ch = doc["ch"] | -1;

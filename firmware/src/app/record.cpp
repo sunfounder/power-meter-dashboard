@@ -152,6 +152,83 @@ bool DataRecorder::startChannel(int ch, const char *testName) {
   return true;
 }
 
+// Resume an interrupted recording: reuse the existing file (append), strip any
+// trailing magic, and continue with the real sample count.
+bool DataRecorder::resumeChannel(int ch, const char *testName, const char *resume_file) {
+  if (ch < 0 || ch > 3) return false;
+  if (!resume_file || !resume_file[0]) return false;
+  if (_states[ch].active) stopChannel(ch);
+
+  String path = String("/data/") + resume_file;
+  if (!LittleFS.exists(path)) return false;
+
+  // (No magic to strip — interrupted files never got renamed to .done)
+  size_t sz = LittleFS.open(path).size();
+
+  strncpy(_filenames[ch], path.c_str(), sizeof(_filenames[ch]) - 1);
+  _filenames[ch][sizeof(_filenames[ch]) - 1] = '\0';
+
+  strncpy(_states[ch].name, testName, sizeof(_states[ch].name) - 1);
+  _states[ch].name[sizeof(_states[ch].name) - 1] = '\0';
+  _states[ch].start_time = millis();
+  _states[ch].start_ts   = (uint32_t)time(nullptr);
+  _states[ch].active = true;
+  _states[ch].sample_count = sz / sizeof(SampleBin);  // carry existing samples
+  _states[ch].last_file[0] = '\0';
+  _rename_pending[ch] = false;
+  DeviceSettings::getInstance().setStopArmed(ch, false, false);
+  _buf_head[ch] = 0;
+  _buf_count[ch] = 0;
+  s_start_beep_pending = true;
+  Serial.printf("[DR] CH%d resumed %s (%lu existing samples)\n", ch + 1, resume_file, _states[ch].sample_count);
+  return true;
+}
+
+// Find crash-interrupted recordings: no "PMDN" magic at EOF and recent by the
+// timestamp embedded in the filename (test_chN_YYYYMMDD_HHMMSS.dat).
+void DataRecorder::findIncomplete(char out[4][64]) {
+  for (int i = 0; i < 4; i++) out[i][0] = '\0';
+  File root = LittleFS.open("/data");
+  if (!root || !root.isDirectory()) return;
+
+  File f = root.openNextFile();
+  while (f) {
+    String nm = String(f.name());
+    size_t sz = f.size();
+    bool hasMagic = (sz % 24 == 4);
+    f.close();
+
+    if (nm.endsWith(".dat") && sz >= 24) {
+      // Not renamed to .done = interrupted. Recent by filename timestamp.
+      int p1 = nm.lastIndexOf('_');
+      if (p1 >= 0) {
+        int p2 = nm.lastIndexOf('.');
+        String ts = nm.substring(p1 + 1, p2);  // YYYYMMDD_HHMMSS
+        int y = ts.substring(0,4).toInt(), mo = ts.substring(4,6).toInt(), d = ts.substring(6,8).toInt();
+        int h = ts.substring(9,11).toInt(), mi = ts.substring(11,13).toInt(), s = ts.substring(13,15).toInt();
+        struct tm tm = {0};
+        tm.tm_year = y - 1900; tm.tm_mon = mo - 1; tm.tm_mday = d;
+        tm.tm_hour = h; tm.tm_min = mi; tm.tm_sec = s;
+        time_t ft = mktime(&tm);
+        int8_t tz = DeviceSettings::getInstance().tzOffset();
+        ft -= tz * 3600;  // filename time is local; epoch is UTC
+        time_t now = time(nullptr);
+        if (now > 1600000000 && ft > 0 && (now - ft) < 7200) {  // within 2h
+          const char *base = strrchr(nm.c_str(), '/');
+          const char *bare = base ? base + 1 : nm.c_str();
+          // Assign to a channel slot based on the chN marker in the name
+          int chm = nm.indexOf("ch");
+          int ch = (chm >= 0) ? (nm.substring(chm+2, chm+3).toInt() - 1) : 0;
+          if (ch < 0 || ch > 3) ch = 0;
+          if (out[ch][0] == '\0') strncpy(out[ch], bare, 63);
+        }
+      }
+    }
+    f = root.openNextFile();
+  }
+  root.close();
+}
+
 void DataRecorder::stopChannel(int ch) {
   if (ch < 0 || ch > 3) return;
   if (_states[ch].active) {
@@ -167,6 +244,16 @@ void DataRecorder::stopChannel(int ch) {
       _rename_pending[ch] = false;
     }
     _flushBuffer(ch);
+    // Mark completion by renaming .dat → .done (crash recovery scans for .dat)
+    {
+      String p = String(_filenames[ch]);
+      String done = p + ".done";
+      LittleFS.remove(done);
+      if (LittleFS.rename(p, done)) {
+        strncpy(_filenames[ch], done.c_str(), sizeof(_filenames[ch]) - 1);
+        _filenames[ch][sizeof(_filenames[ch]) - 1] = '\0';
+      }
+    }
     // Store bare filename (no /data/ prefix) for the web UI
     const char *base = strrchr(_filenames[ch], '/');
     strncpy(_states[ch].last_file, base ? base + 1 : _filenames[ch], sizeof(_states[ch].last_file) - 1);
@@ -258,7 +345,7 @@ void DataRecorder::listFilesToJson(JsonArray &arr) {
     size_t sz = f.size();
     f.close();
     // Keep only .dat files (skip .csv/others if any)
-    if (nm.endsWith(".dat")) {
+    if (nm.endsWith(".dat") || nm.endsWith(".done")) {
       // Strip "/data/" prefix
       const char *base = strrchr(nm.c_str(), '/');
       JsonObject o = arr.add<JsonObject>();
@@ -293,7 +380,7 @@ static int collectDatFiles(char names[][64], int max) {
   while ((f = root.openNextFile()) && n < max) {
     String nm = String(f.name());
     f.close();
-    if (nm.endsWith(".dat")) {
+    if (nm.endsWith(".dat") || nm.endsWith(".done")) {
       strncpy(names[n], nm.c_str(), 63);
       names[n][63] = '\0';
       n++;

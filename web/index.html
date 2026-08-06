@@ -540,6 +540,20 @@ function processData(d){
     if(!d)return;
     lastData=d;document.getElementById('connDot').className='conn-dot';
     if(d.temp_unit){tempUnit=d.temp_unit;}
+    // Crash-recovery prompt (once per connection): interrupted recording found
+    if(d.incomplete&&!window.__incompleteAsked){
+      window.__incompleteAsked=true;
+      const found=d.incomplete.filter(x=>x&&x.file);
+      if(found.length){
+        const it=found[0];
+        if(confirm('检测到未完成录制 (CH'+(it.ch+1)+'): '+it.file+'\n设备可能意外重启过。\n是否继续录制？\n(选"确定"续录到原文件，"取消"忽略)')&&it.ch!=null){
+          wsSend({type:'cmd',cmd:'record_start',ch:it.ch,name:'test',resume_file:it.file});
+          toast('已续录 '+it.file);
+        }else{
+          toast('已忽略未完成录制');
+        }
+      }
+    }
     // WiFi signal indicator (color by RSSI)
     const wf=document.getElementById('wifiIcon');
     if(wf){
@@ -875,7 +889,7 @@ function loadFiles(){
       let html='<span style="color:#555;font-size:10px">'+fl.length+'/'+MAX_FILES+' 个文件</span>';
       fl.forEach(f=>{
         html+='<div class="file-row"><input type="checkbox" class="file-cb" value="'+f.name+'" onchange="onFileCheck()">'+
-          '<span class="fname" title="'+f.name+'">'+f.name.replace('.dat','')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
+          '<span class="fname" title="'+f.name+'">'+f.name.replace(/\.(dat|done)$/,'')+'</span><span class="fsize">'+(f.size/1024).toFixed(1)+'KB</span>'+
           '<a class="btn-dl" href="#" onclick="downloadCSVFile(\''+f.name+'\');return false" title="下载"><i class="fa fa-download"></i></a>'+
           '<button class="btn-del" onclick="if(confirm(\'删除?\')){wsSend({type:\'cmd\',cmd:\'delete\',file:\''+f.name+'\'});setTimeout(loadFiles,300);}" title="删除"><i class="fa fa-trash"></i></button></div>';
       });
@@ -1147,7 +1161,7 @@ async function downloadCSVFile(fname){
   }
   toast('转换完成，请选择保存位置');
   const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download=fname.replace('.dat','.csv');a.click();
+  a.href=URL.createObjectURL(blob);a.download=fname.replace(/\.(dat|done)$/,'.csv');a.click();
   URL.revokeObjectURL(a.href);
 }
 

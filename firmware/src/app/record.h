@@ -32,9 +32,15 @@ public:
   bool begin();
 
   bool startChannel(int ch, const char *testName);
+  // Resume an interrupted recording (crash recovery): appends to resume_file
+  // (bare name, no /data/) and carries the existing sample count.
+  bool resumeChannel(int ch, const char *testName, const char *resume_file);
   void stopChannel(int ch);
   bool isChannelRecording(int ch) const;
   bool isAnyRecording() const;
+  // Scan /data for crash-interrupted recordings (no completion magic,
+  // recent by embedded filename timestamp). Fills up to 4 bare filenames.
+  void findIncomplete(char out[4][64]);
   // Rename the in-progress recording (display name + final filename)
   void renameCurrent(int ch, const char *newName);
   // Beep flags: set in any task context, consumed in loop() (LEDC is not
