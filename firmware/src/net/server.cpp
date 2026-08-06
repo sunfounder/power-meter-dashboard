@@ -277,7 +277,7 @@ static void streamAbort(const char *why) {
 }
 
 void PowerMeterWebServer::streamTick() {
-  if (s_tx_mode == 0) return;
+  if (s_tx_mode != 1) return;  // stream mode only — download has its own tick
   uint32_t now = millis();
   if (now - s_stream_last < 10) return;  // throttle ~100 chunks/s (windowed TX, backpressure below)
   s_stream_last = now;
