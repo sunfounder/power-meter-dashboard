@@ -464,6 +464,9 @@ function toggleSeries(ch, idx){
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
+  // Flex containers may not be laid out yet at init — force a resize so the
+  // canvas gets a real size (otherwise the chart renders invisible/0-height)
+  setTimeout(()=>{if(charts[i])charts[i].resize();},200);
   c.setOption({
     legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
     grid:{left:10,right:10,top:8,bottom:25},

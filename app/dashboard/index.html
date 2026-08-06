@@ -281,8 +281,9 @@ function connectWS(ip){
   };
   ws.onmessage=e=>{
     if(e.data instanceof ArrayBuffer){
-      // Binary frame: .dat download chunk
-      if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
+      // Binary frame: history stream chunk or .dat download chunk
+      if(streamActive){console.log('[STREAM] +'+e.data.byteLength+'B');streamChunks.push(new Uint8Array(e.data));}
+      else if(dlActive){console.log('[WS] binary chunk +'+e.data.byteLength);dlChunks.push(new Uint8Array(e.data));}
       return;
     }
     let msg;try{msg=JSON.parse(e.data);}catch(_){console.log('[WS] BAD JSON frame len='+e.data.length+' head='+String(e.data).slice(0,80));return;}
@@ -292,7 +293,9 @@ function connectWS(ip){
       console.log('[WS] m ch='+chs.map(c=>c&&c.connected?'1':'0').join('')+' rec='+rec);
     }
     else if(msg.type==='ack')console.log('[WS] ack',msg.cmd,msg.ok);
+    else if(msg.type==='stream_done')console.log('[STREAM] done total='+msg.total);
     else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
+    if(msg.type==='stream_done'){window.dispatchEvent(new Event('stream-done'));return;}
     if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
     if(msg.type==='dl_fail'){window.dispatchEvent(new CustomEvent('dl-fail',{detail:msg.error}));return;}
     if(msg.type==='ack'&&msg.req_id&&wsPending[msg.req_id]){
@@ -461,6 +464,9 @@ function toggleSeries(ch, idx){
 function ic(i){
   const d=document.getElementById('cx'+i);if(!d||charts[i])return;
   const c=echarts.init(d,null,{renderer:'canvas'});charts[i]=c;
+  // Flex containers may not be laid out yet at init — force a resize so the
+  // canvas gets a real size (otherwise the chart renders invisible/0-height)
+  setTimeout(()=>{if(charts[i])charts[i].resize();},200);
   c.setOption({
     legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
     grid:{left:10,right:10,top:8,bottom:25},
@@ -670,24 +676,26 @@ function up(){
 function uc(){
   if(!lastData)return;
   for(let i=0;i<4;i++){
-    const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
-    const c=charts[i];if(!c)continue;
-    if(recState[i]!==1)continue;
-    const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
-    const pts=[];
-    for(let m=0;m<4;m++){
-      let v=raw[m];
-      if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
-      pts.push(v||0);
-    }
-    const idx=sampleCount[i]++;
-    const opts={series:[]};
-    for(let m=0;m<4;m++){
-      const data=[...c.getOption().series[m].data];
-      data.push([idx,disp(pts[m],i)]);
-      opts.series.push({data});
-    }
-    c.setOption(opts,{notMerge:false});
+    try{
+      const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
+      const c=charts[i];if(!c){console.log('[UC] ch'+i+' chart null');continue;}
+      if(recState[i]!==1)continue;
+      const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
+      const pts=[];
+      for(let m=0;m<4;m++){
+        let v=raw[m];
+        if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
+        pts.push(v||0);
+      }
+      const idx=sampleCount[i]++;
+      const opts={series:[]};
+      for(let m=0;m<4;m++){
+        const data=[...c.getOption().series[m].data];
+        data.push([idx,disp(pts[m],i)]);
+        opts.series.push({data});
+      }
+      c.setOption(opts,{notMerge:false});
+    }catch(e){console.log('[UC] ch'+i+' err:',e.message);}
   }
 }
 
@@ -1005,6 +1013,8 @@ if(window.electron){
 
 // ── Download .dat → convert to CSV client-side (over WebSocket binary) ──
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
+// History stream state (binary chunks from device until stream_done)
+let streamActive=false, streamChunks=[];
 let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
   if(dlActive){toast('已有下载进行中');return;}
@@ -1043,45 +1053,48 @@ async function downloadCSVFile(fname){
   URL.revokeObjectURL(a.href);
 }
 
-// ── Pull buffered data to fill chart after page refresh ──
+// ── Pull buffered data to fill chart after page refresh (streaming) ──
 async function loadBufferData(i){
   const ld=document.getElementById('cload'+i);
   if(ld)ld.style.display='flex';
   try{
-  // Paginated fetch: pull all samples in pages (device can't
-  // serialize a whole .dat to JSON at once without OOM)
-  const PAGE=200;
-  let all=[];
-  let off=0;
-  let pages=0;
-  for(;;){
-    // Retry each page (AsyncTCP send queue can drop frames under broadcast)
-    let d=null;
-    for(let r=0;r<3&&!d;r++){
-      try{d=await wsReq({type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE},12000);}
-      catch(e){console.log('[HIST] ch'+i+' page '+off+' try '+r+' failed: '+e.message);}
+    streamChunks=[];streamActive=true;
+    const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i},5000);
+    if(!ack||!ack.ok){streamActive=false;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
+    // Wait until device pushes all chunks then stream_done
+    await new Promise((res,rej)=>{
+      const t=setTimeout(()=>{streamActive=false;rej(new Error('stream timeout'));},30000);
+      window.addEventListener('stream-done',()=>{clearTimeout(t);streamActive=false;res();},{once:true});
+    });
+    const total=streamChunks.reduce((n,c)=>n+c.length,0);
+    if(!total){console.log('[HIST] ch'+i+' empty stream');return;}
+    const u8=new Uint8Array(total);let off=0;
+    for(const c of streamChunks){u8.set(c,off);off+=c.length;}
+    const v=new DataView(u8.buffer);
+    const all=[];
+    for(let o=0;o+24<=total;o+=24){
+      all.push({t:v.getUint32(o,true),V:v.getFloat32(o+4,true),A:v.getFloat32(o+8,true),
+                W:v.getFloat32(o+12,true),C:v.getFloat32(o+16,true)});
     }
-    if(!d||!d.data||!d.data.length){console.log('[HIST] ch'+i+' end at offset '+off);break;}
-    pages++;
-    all=all.concat(d.data);
-    if(d.data.length<PAGE)break;
-    off+=PAGE;
-  }
-  console.log('[HIST] ch'+i+' pulled '+all.length+' samples in '+pages+' page(s)');
-  if(!all.length)return;
-  const c=charts[i];if(!c)return;
-  sampleCount[i]=Math.max(sampleCount[i]||0,all.length);
-  const firstT=all[0].t||0;
-  const fmtRel=sec=>{const s=Math.max(0,Math.floor(sec));return (Math.floor(s/60)<10?'0':'')+Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);};
-  dataStore[i]=all.map(p=>({t:fmtRel((p.t||0)-firstT),V:p.V,A:p.A,W:p.W,C:p.C}));
-  const opts={series:[]};
-  for(let m=0;m<4;m++){
-    const key=['V','A','W','C'][m];
-    const data=all.map((p,j)=>[j,disp(parseFloat(p[key])||0,i)]);
-    opts.series.push({data});
-  }
-  c.setOption(opts,{notMerge:false});
+    console.log('[HIST] ch'+i+' pulled '+all.length+' samples');
+    if(!all.length)return;
+    const c=charts[i];if(!c){console.log('[HIST] ch'+i+' chart missing');return;}
+    sampleCount[i]=Math.max(sampleCount[i]||0,all.length);
+    const firstT=all[0].t||0;
+    const fmtRel=sec=>{const s=Math.max(0,Math.floor(sec));return (Math.floor(s/60)<10?'0':'')+Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);};
+    dataStore[i]=all.map(p=>({t:fmtRel((p.t||0)-firstT),V:p.V,A:p.A,W:p.W,C:p.C}));
+    const opts={series:[]};
+    for(let m=0;m<4;m++){
+      const key=['V','A','W','C'][m];
+      const data=all.map((p,j)=>[j,disp(parseFloat(p[key])||0,i)]);
+      opts.series.push({data});
+    }
+    c.setOption(opts,{notMerge:false});
+    console.log('[HIST] ch'+i+' chart drawn');
+  }catch(e){
+    console.log('[HIST] ch'+i+' error:',e.message);
   }finally{
+    streamActive=false;
     if(ld)ld.style.display='none';
   }
 }
