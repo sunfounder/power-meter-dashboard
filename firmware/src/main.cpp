@@ -236,6 +236,8 @@ void loop() {
 
   // Push history stream chunks (throttled internally to ~50/s)
   PowerMeterWebServer::getInstance().streamTick();
+  // Push download chunks (same backpressured state machine)
+  PowerMeterWebServer::getInstance().downloadTick();
 
   checkAlarms();
 

@@ -62,8 +62,9 @@ ws.onopen = async () => {
     // 6. stream_start on largest file — measure
     const f3 = await req('files');
     const fl3 = (f3 && f3.data) || [];
+    let big = null;
     if (fl3.length) {
-      const big = fl3.reduce((a,b) => a.size > b.size ? a : b);
+      big = fl3.reduce((a,b) => a.size > b.size ? a : b);
       log('stream_start (largest ' + big.name + ' ' + big.size + 'B)', true, '');
       const ss = await req('stream_start', { ch: 0, file: big.name });
       log('stream_start ack', ss && ss.ok === true, ss && 'total=' + ss.total);

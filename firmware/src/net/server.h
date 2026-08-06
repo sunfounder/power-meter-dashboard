@@ -34,6 +34,8 @@ public:
 
   // Streaming history: push .dat samples as binary chunks (called from main loop)
   void streamTick();
+  // Download: push raw file bytes with the same backpressure (called from main loop)
+  void downloadTick();
 
   // Notification
   void notifyAlarm(int channel, const char *message);

@@ -254,12 +254,13 @@ volatile uint32_t ws_send_busy_until = 0;
 static int  s_stream_ch = -1;        // active channel, -1 = idle
 static int  s_stream_client = -1;    // requesting client id
 static File s_stream_file;           // open .dat (invalid when file part done)
-static uint32_t s_stream_off = 0;    // next sample index to send
+static uint32_t s_stream_off = 0;    // next sample index (stream) or byte offset (download)
 static uint32_t s_stream_n_file = 0; // samples in file part
-static uint32_t s_stream_total = 0;  // total samples (file + ring buffer)
+static uint32_t s_stream_total = 0;  // total samples (stream) or file bytes (download)
 static uint32_t s_stream_last = 0;   // last tick ms
 static int  s_stream_fail = 0;       // consecutive send failures (abort guard)
 static int  s_done_fail = 0;         // consecutive done-send failures (abort guard)
+static int  s_tx_mode = 0;           // 0=idle, 1=stream samples, 2=download bytes
 
 // Abort a stream cleanly from ANY path: close the file handle, reset state,
 // resume broadcasts. This is the only place that tears the stream down, so no
@@ -270,12 +271,13 @@ static void streamAbort(const char *why) {
   s_stream_client = -1;
   s_stream_fail = 0;
   s_done_fail = 0;
+  s_tx_mode = 0;
   ws_send_busy_until = 0;
   Serial.printf("[STREAM] aborted: %s\n", why);
 }
 
 void PowerMeterWebServer::streamTick() {
-  if (s_stream_ch < 0) return;
+  if (s_tx_mode == 0) return;
   uint32_t now = millis();
   if (now - s_stream_last < 10) return;  // throttle ~100 chunks/s (windowed TX, backpressure below)
   s_stream_last = now;
@@ -334,7 +336,7 @@ void PowerMeterWebServer::streamTick() {
     return;
   }
 
-  // Done
+  // Stream done
   JsonDocument done;
   done["type"] = "stream_done";
   done["ch"] = s_stream_ch;
@@ -345,13 +347,53 @@ void PowerMeterWebServer::streamTick() {
   if (!cl->text(j)) {
     if (++s_done_fail > 10) streamAbort("done send failed 10x");
     else Serial.println("[STREAM] done send failed, retrying");
-    return;  // keep s_stream_ch, retry next tick
+    return;  // keep state, retry next tick
   }
   s_done_fail = 0;
   ws_send_busy_until = 0;  // resume broadcasts
   s_stream_ch = -1;
   s_stream_client = -1;
+  s_tx_mode = 0;
   Serial.printf("[STREAM] ch%d done, %u samples\n", s_stream_ch, s_stream_total);
+}
+
+// Download branch (mode 2): push raw file bytes with the same backpressure
+void PowerMeterWebServer::downloadTick() {
+  if (s_tx_mode != 2) return;
+  uint32_t now = millis();
+  if (now - s_stream_last < 10) return;
+  s_stream_last = now;
+
+  auto *cl = _ws.client(s_stream_client);
+  if (!cl || cl->status() != WS_CONNECTED) { streamAbort("client gone"); return; }
+
+  uint8_t buf[2048];
+  size_t rd = s_stream_file.read(buf, sizeof(buf));
+  if (rd > 0) {
+    if (cl->queueLen() >= 8) {
+      s_stream_file.seek(s_stream_file.position() - rd);  // rewind on backpressure
+      return;
+    }
+    if (cl->binary(buf, rd)) {
+      s_stream_fail = 0;
+    } else {
+      s_stream_file.seek(s_stream_file.position() - rd);
+      if (++s_stream_fail > 5) streamAbort("send failed 5x");
+    }
+    return;
+  }
+
+  // Done
+  s_stream_file.close();
+  if (!cl->text("{\"type\":\"dl_done\"}")) {
+    if (++s_done_fail > 10) streamAbort("done send failed 10x");
+    return;
+  }
+  s_done_fail = 0;
+  ws_send_busy_until = 0;
+  s_stream_client = -1;
+  s_tx_mode = 0;
+  Serial.println("[DL] done");
 }
 
 void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
@@ -517,20 +559,34 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       if (fname.length() && fname.indexOf('/') < 0 && fname.indexOf('\\') < 0) {
         String path = "/data/" + fname;
         if (LittleFS.exists(path)) {
-          File f = LittleFS.open(path);
-          if (f) {
-            uint8_t buf[512];
-            size_t rd;
-            while ((rd = f.read(buf, sizeof(buf))) > 0) {
-              client->binary(buf, rd);
-            }
-            f.close();
+          s_stream_file = LittleFS.open(path);
+          if (s_stream_file) {
+            s_tx_mode = 2;  // download mode (state machine, backpressured)
+            s_stream_client = client->id();
+            s_stream_off = 0;
+            s_stream_total = s_stream_file.size();
+            s_stream_last = 0;
+            s_stream_fail = 0;
+            s_done_fail = 0;
+            ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts during transfer
             ok = true;
           }
         }
       }
-      client->text(ok ? "{\"type\":\"dl_done\"}"
-                      : "{\"type\":\"dl_fail\",\"error\":\"file not found\"}");
+      if (!ok) {
+        if (s_stream_file) s_stream_file.close();
+        s_stream_client = -1;
+        s_tx_mode = 0;
+        ws_send_busy_until = 0;
+      }
+      JsonDocument dack;
+      dack["type"] = "ack";
+      dack["cmd"] = "download_start";
+      dack["ok"] = ok;
+      dack["req_id"] = doc["req_id"] | 0;
+      String djson;
+      serializeJson(dack, djson);
+      client->text(djson);
       return;
     } else if (cmd == "stream_start") {
       int ch = doc["ch"] | -1;
@@ -569,6 +625,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             s_stream_last = 0;  // force first chunk immediately
             s_stream_fail = 0;
             s_done_fail = 0;
+            s_tx_mode = 1;  // stream mode
             ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts for the whole stream (no send-queue contention)
             ok = true;
           }
