@@ -1,6 +1,7 @@
 // Full WS API test suite
 const IP = '192.168.100.243';
 const ws = new WebSocket('ws://' + IP + '/ws');
+ws.binaryType = 'arraybuffer';
 const results = [];
 let rid = 0;
 const pending = {};
