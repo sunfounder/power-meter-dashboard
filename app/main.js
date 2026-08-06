@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// ECharts needs eval (bundled build) → CSP allows unsafe-eval; silence the dev warning
+// (packaged builds don't show security warnings anyway)
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = '1';
+
 let mainWindow, logBuf = [];
 
 app.commandLine.appendSwitch('disable-web-security');
