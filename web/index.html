@@ -529,13 +529,23 @@ function ic(i){
     legend:{show:false,selected:{V:true,A:true,W:true,C:true}},
     grid:{left:10,right:10,top:8,bottom:25},
     tooltip:{trigger:'axis',confine:true,formatter:params=>{
-      let t='';const d=new Date(params[0].value[0]*1000);
-      t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)+'<br/>';
+      let t='';
+      const x=params[0].value[0];
+      if(x<1000000000){  // NTP not synced: relative time from 0
+        const m=Math.floor(x/60),s=x%60;
+        t=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+'<br/>';
+      }else{
+        const d=new Date(x*1000);
+        t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)+'<br/>';
+      }
       params.forEach(p=>{t+=p.marker+' '+p.seriesName+': '+p.value[1].toFixed(3)+'<br/>';});
       return t;
     }},
     dataZoom:[{type:'inside',start:0,end:100}],
-    xAxis:{type:'value',splitLine:{show:true,lineStyle:{color:TC('border2'),width:0.5}},axisLabel:{color:TC('grid'),fontSize:8,formatter:v=>{const d=new Date(v*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}}},
+    xAxis:{type:'value',splitLine:{show:true,lineStyle:{color:TC('border2'),width:0.5}},axisLabel:{color:TC('grid'),fontSize:8,formatter:v=>{
+      if(v<1000000000){const m=Math.floor(v/60),s=v%60;return m+':'+('0'+s).slice(-2);}
+      const d=new Date(v*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    }}},
     yAxis:[
       // abs mode: 0 at bottom (positive data only); signed mode: symmetric, 0 centered
       {type:'value',min:v=>absMode[i]?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{show:false},axisLabel:{show:false},splitArea:{show:false}},
@@ -731,7 +741,7 @@ function up(){
     document.getElementById('ct'+i).textContent=r.elapsed||'00:00';
     const ch=chs[i];
     if(ch&&ch.connected){
-      const fmtClock=ts=>{const d=new Date((ts||0)*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
+      const fmtClock=ts=>{if(ts<1000000000){const m=Math.floor(ts/60),ss=ts%60;return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;}const d=new Date((ts||0)*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
       dataStore[i].push({t:fmtClock(d.timestamp),V:ch.bus_voltage_V,A:ch.current_mA/1000,W:(ch.power_mW||0)/1000,C:ch.channel_temp_C});
     }
   }
