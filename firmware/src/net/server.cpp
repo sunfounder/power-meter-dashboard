@@ -265,6 +265,16 @@ void PowerMeterWebServer::streamTick() {
   if (now - s_stream_last < 20) return;  // throttle ~50 chunks/s
   s_stream_last = now;
 
+  // Client may have disconnected mid-stream (e.g. page refresh) — abort cleanly
+  auto *cl = _ws.client(s_stream_client);
+  if (!cl) {
+    if (s_stream_file) s_stream_file.close();
+    ws_send_busy_until = 0;
+    s_stream_ch = -1;
+    Serial.println("[STREAM] client gone, aborted");
+    return;
+  }
+
   auto &rec = DataRecorder::getInstance();
 
   SampleBin chunk[50];  // 50 × 24B = 1200B per frame
@@ -293,7 +303,7 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
-    _ws.client(s_stream_client)->binary((uint8_t *)chunk, n * sizeof(SampleBin));
+    cl->binary((uint8_t *)chunk, n * sizeof(SampleBin));
     return;
   }
 
