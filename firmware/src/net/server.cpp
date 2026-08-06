@@ -637,6 +637,7 @@ static void handleStatus(AsyncWebServerRequest *request) {
   doc["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
   doc["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("");
   doc["wifi_ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("");
+  doc["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127;
 
   JsonArray ch_arr = doc["channels"].to<JsonArray>();
   for (int i = 0; i < 4; i++) {

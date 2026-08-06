@@ -156,7 +156,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <div class="right">
     <span class="ambient" id="ambTemp">--.-</span>
     <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
-    <span id="wifiIcon" title="WiFi 信号"><i class="fa fa-wifi"></i></span>
+    <span id="wifiIcon" title="WiFi 信号" style="font-size:14px;color:var(--dim);margin:0 6px"><i class="fa fa-wifi"></i></span>
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
@@ -291,29 +291,9 @@ function connectWS(ip){
     if(e.data instanceof ArrayBuffer){
       // Binary frame: history stream chunk or .dat download chunk
       if(streamActive){
-        const t0=performance.now();
         streamChunks.push(new Uint8Array(e.data));
-        appendStreamChunk(e.data);
-        const dt=performance.now()-t0;
-        if(streamGot[streamChan]%500<50)console.log('[STREAM] chunk +'+e.data.byteLength+'B parsed='+dt.toFixed(1)+'ms got='+streamGot[streamChan]);
-        // reset stall watchdog on every chunk
-        if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
-        streamWatch=setTimeout(()=>{
-          streamWatch=null;
-          if(streamActive){
-            if(++streamStall<=3){
-              const ci2=streamChan;
-              console.log('[STREAM] stalled 3s — resume from '+streamGot[ci2]+' (#'+streamStall+')');
-              streamActive=false;streamChan=-1;
-              const resumeAt=streamGot[ci2]||0;
-              setTimeout(()=>loadBufferData(ci2,resumeAt),500*streamStall);  // backoff + resume
-            }else{
-              streamActive=false;streamChan=-1;
-              toast('历史数据加载中断，请刷新重试');
-              console.log('[STREAM] gave up after '+streamStall+' restarts');
-            }
-          }
-        },3000);
+        streamGot[streamChan]+=e.data.byteLength/24;
+        armStreamWatch();  // reset stall watchdog on every chunk
       }
       else if(dlActive){dlChunks.push(new Uint8Array(e.data));}
       return;
@@ -329,40 +309,10 @@ function connectWS(ip){
     else if(msg.type==='dl_done'||msg.type==='dl_fail')console.log('[WS]',msg.type);
     if(msg.type==='stream_done'){
       console.log('[STREAM] done total='+msg.total);
-      // Flush any remaining queued samples immediately (skip slow-draw pacing)
-      const fi=streamChan;
-      if(fi>=0&&histQueue[fi]&&histQueue[fi].length&&charts[fi]){
-        if(!histData[fi])histData[fi]=[[],[],[],[]];
-        for(const s of histQueue[fi]){
-          for(let m=0;m<4;m++)histData[fi][m].push([s.ts,disp(s.vals[m],fi)]);
-        }
-        histQueue[fi]=[];
-        const opts={series:[]};
-        for(let m=0;m<4;m++)opts.series.push({data:histData[fi][m]});
-        charts[fi].setOption(opts,{notMerge:false});
-      }
-      // Live chart continues from the end of history: release fixed X max
-      if(fi>=0&&charts[fi])charts[fi].setOption({xAxis:{max:null}},{notMerge:false});
-      if(fi>=0)sampleCount[fi]=0;
-      // Assemble the detail-table data store from all received chunks
-      const i=streamChan;
-      const total=streamChunks.reduce((n,c)=>n+c.length,0);
-      if(i>=0&&total){
-        const u8=new Uint8Array(total);let off=0;
-        for(const c of streamChunks){u8.set(c,off);off+=c.length;}
-        const v=new DataView(u8.buffer);
-        const fmtClock=ts=>{const d=new Date(ts*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
-        dataStore[i]=[];
-        for(let o=0;o+24<=total;o+=24){
-          const ts=v.getUint32(o,true);
-          dataStore[i].push({t:fmtClock(ts),V:v.getFloat32(o+4,true),A:v.getFloat32(o+8,true),
-                             W:v.getFloat32(o+12,true),C:v.getFloat32(o+16,true)});
-        }
-        if(typeof updateTables==='function')updateTables();
-      }
-      streamActive=false;streamChan=-1;streamChunks=[];streamStall=0;
+      streamStall=0;
       if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
-      window.dispatchEvent(new Event('stream-done'));
+      // loadBufferData is awaiting this — it assembles chunks and draws once
+      if(streamDoneResolve){streamDoneResolve();streamDoneResolve=null;}
       return;
     }
     if(msg.type==='dl_done'){window.dispatchEvent(new Event('dl-done'));return;}
@@ -1201,32 +1151,64 @@ async function downloadCSVFile(fname){
   URL.revokeObjectURL(a.href);
 }
 
-// ── Start history stream: chunks are appended to the chart as they arrive ──
+// ── Start history stream: collect all binary chunks, draw once when done ──
+let streamDoneResolve=null;
 async function loadBufferData(i, offset, file){
   if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
   streamChunks=[];streamActive=true;streamChan=i;
   streamGot[i]=offset||0;
-  if(!offset){
-    // Fresh load: history stream is authoritative — clear idle preview + dedupe state
-    maxTs[i]=0;firstTs[i]=0;seq[i]=0;
-    if(charts[i])charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
-      xAxis:{min:null,max:null}},{notMerge:false});
-  }
+  const ld=document.getElementById('cload'+i);
+  if(ld)ld.style.display='flex';  // spinner while loading
   try{
     const req={type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]};
     if(file)req.file=file;  // stopped recording file (explicit filename)
     const ack=await wsReq(req,5000);
-    if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
-    // X axis starts at the recording start time (skip if NTP wasn't synced)
-    if(ack.start_ts>1000000000){
-      setTimeout(()=>{const c=charts[i];if(c)c.setOption({xAxis:{min:ack.start_ts}},{notMerge:false});},50);
+    if(!ack||!ack.ok){console.log('[HIST] ch'+i+' stream_start failed');return;}
+    // Wait for stream_done (watchdog resumes on stall; chunks accumulate)
+    await new Promise((res)=>{
+      streamDoneResolve=res;
+      setTimeout(()=>{if(streamDoneResolve){streamDoneResolve=null;res();}},30000);
+    });
+    // Assemble everything and draw ONCE (no incremental rendering)
+    const total=streamChunks.reduce((n,c)=>n+c.length,0);
+    if(!total){console.log('[HIST] ch'+i+' empty');return;}
+    const u8=new Uint8Array(total);let off=0;
+    for(const c of streamChunks){u8.set(c,off);off+=c.length;}
+    const v=new DataView(u8.buffer);
+    const c=charts[i];if(!c){console.log('[HIST] ch'+i+' chart null');return;}
+    const hd=[[],[],[],[]];
+    let firstTs2=0;
+    for(let o=0;o+24<=total;o+=24){
+      const ts=v.getUint32(o,true);
+      if(ts<1000000000)continue;  // NTP-unsynced garbage — skip
+      if(!firstTs2)firstTs2=ts;
+      const vals=[v.getFloat32(o+4,true),v.getFloat32(o+8,true),v.getFloat32(o+12,true),v.getFloat32(o+16,true)];
+      for(let m=0;m<4;m++)hd[m].push([ts,disp(vals[m],i)]);
+      maxTs[i]=ts;
     }
-    setTimeout(()=>{if(charts[i])charts[i].resize();},50);  // canvas size before appending
+    if(firstTs2&&hd[0].length){
+      c.setOption({series:[{data:hd[0]},{data:hd[1]},{data:hd[2]},{data:hd[3]}],
+        xAxis:{min:firstTs2}},{notMerge:false});
+      sampleCount[i]=hd[0].length;
+      console.log('[HIST] ch'+i+' drew '+hd[0].length+' samples (from '+total/24+' raw)');
+      // Fill the detail table too
+      const fmtClock=ts=>{const d=new Date(ts*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);};
+      dataStore[i]=[];
+      for(let o=0;o+24<=total;o+=24){
+        const ts=v.getUint32(o,true);
+        if(ts<1000000000)continue;
+        dataStore[i].push({t:fmtClock(ts),V:v.getFloat32(o+4,true),A:v.getFloat32(o+8,true),
+                           W:v.getFloat32(o+12,true),C:v.getFloat32(o+16,true)});
+      }
+      if(typeof updateTables==='function')updateTables();
+    }
   }catch(e){
-    streamActive=false;streamChan=-1;
-    console.log('[HIST] ch'+i+' stream_start error:',e.message);
+    console.log('[HIST] ch'+i+' err:',e.message);
+  }finally{
+    streamActive=false;streamChan=-1;streamChunks=[];
+    if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
+    if(ld)ld.style.display='none';
   }
-  // No spinner: chart fills progressively via appendStreamChunk()
 }
 
 // History series data kept client-side; redraw in batches (appendData proved
@@ -1267,31 +1249,23 @@ setInterval(()=>{
   }
 },HIST_BATCH_MS);
 
-// Append one binary chunk to the queue (slow-draw loop renders it)
-function appendStreamChunk(buf){
-  try{
-    const i=streamChan;if(i<0)return;
-    const u8=new Uint8Array(buf);
-    const v=new DataView(u8.buffer);
-    const n=Math.floor(u8.byteLength/24);
-    if(!n)return;
-    streamGot[i]+=n;
-    if(!histQueue[i])histQueue[i]=[];
-    for(let o=0;o<n;o++){
-      const b=o*24;
-      const ts=v.getUint32(b,true);  // device epoch seconds, used as-is
-      if(ts<=maxTs[i])continue;  // already drawn (resume) — skip
-      maxTs[i]=ts;
-      // Pin X axis start at the recording start time (synchronous)
-      if(firstTs[i]===0){
-        firstTs[i]=ts;
-        const nowTs=Math.floor(Date.now()/1000);
-        const c=charts[i];
-        if(c)c.setOption({xAxis:{min:ts,max:Math.max(nowTs,ts+1)}},{notMerge:false});
-      }
-      histQueue[i].push({ts,vals:[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)]});
+// Stream stall watchdog: resume from the received offset (keep collecting)
+function armStreamWatch(){
+  if(streamWatch)clearTimeout(streamWatch);
+  streamWatch=setTimeout(()=>{
+    streamWatch=null;
+    if(!streamActive)return;
+    if(++streamStall<=3){
+      const ci2=streamChan;
+      console.log('[STREAM] stalled 3s — resume from '+streamGot[ci2]+' (#'+streamStall+')');
+      wsSend({type:'cmd',cmd:'stream_start',ch:ci2,offset:streamGot[ci2]});
+      armStreamWatch();
+    }else{
+      streamActive=false;streamChan=-1;
+      if(streamDoneResolve){streamDoneResolve();streamDoneResolve=null;}
+      toast('历史数据加载中断，请刷新重试');
     }
-  }catch(e){console.log('[HIST] append err:',e.message);}
+  },3000);
 }
 </script>
 </body>
