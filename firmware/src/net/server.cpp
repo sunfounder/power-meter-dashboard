@@ -258,6 +258,21 @@ static uint32_t s_stream_off = 0;    // next sample index to send
 static uint32_t s_stream_n_file = 0; // samples in file part
 static uint32_t s_stream_total = 0;  // total samples (file + ring buffer)
 static uint32_t s_stream_last = 0;   // last tick ms
+static int  s_stream_fail = 0;       // consecutive send failures (abort guard)
+static int  s_done_fail = 0;         // consecutive done-send failures (abort guard)
+
+// Abort a stream cleanly from ANY path: close the file handle, reset state,
+// resume broadcasts. This is the only place that tears the stream down, so no
+// path can leak the file handle (LittleFS runs out of handles after 1-2 leaks).
+static void streamAbort(const char *why) {
+  if (s_stream_file) s_stream_file.close();
+  s_stream_ch = -1;
+  s_stream_client = -1;
+  s_stream_fail = 0;
+  s_done_fail = 0;
+  ws_send_busy_until = 0;
+  Serial.printf("[STREAM] aborted: %s\n", why);
+}
 
 void PowerMeterWebServer::streamTick() {
   if (s_stream_ch < 0) return;
@@ -267,11 +282,8 @@ void PowerMeterWebServer::streamTick() {
 
   // Client may have disconnected mid-stream (e.g. page refresh) — abort cleanly
   auto *cl = _ws.client(s_stream_client);
-  if (!cl) {
-    if (s_stream_file) s_stream_file.close();
-    ws_send_busy_until = 0;
-    s_stream_ch = -1;
-    Serial.println("[STREAM] client gone, aborted");
+  if (!cl || cl->status() != WS_CONNECTED) {
+    streamAbort("client gone");
     return;
   }
 
@@ -310,12 +322,16 @@ void PowerMeterWebServer::streamTick() {
     // deliver (no more queue overflow → connection drops).
     if (!cl->canSend()) {
       s_stream_off -= n;  // rewind: retry this chunk next tick
+      s_stream_fail = 0;  // not a failure — just waiting
       return;
     }
     if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
-      // sent — offsets already advanced
+      s_stream_fail = 0;  // sent OK
     } else {
-      s_stream_off -= n;  // send failed (queue full): rewind and retry next tick
+      // Send failed (queue full / dead connection): a few retries, then abort
+      // so we never spin forever or leak the file handle.
+      s_stream_off -= n;
+      if (++s_stream_fail > 5) streamAbort("send failed 5x");
     }
     return;
   }
@@ -327,13 +343,16 @@ void PowerMeterWebServer::streamTick() {
   done["total"] = s_stream_total;
   String j;
   serializeJson(done, j);
-  // Done (retry if the send queue is full)
+  // Done (retry a few times if the send queue is full, then abort)
   if (!cl->text(j)) {
-    Serial.println("[STREAM] done send failed, retrying");
+    if (++s_done_fail > 10) streamAbort("done send failed 10x");
+    else Serial.println("[STREAM] done send failed, retrying");
     return;  // keep s_stream_ch, retry next tick
   }
+  s_done_fail = 0;
   ws_send_busy_until = 0;  // resume broadcasts
   s_stream_ch = -1;
+  s_stream_client = -1;
   Serial.printf("[STREAM] ch%d done, %u samples\n", s_stream_ch, s_stream_total);
 }
 
@@ -420,6 +439,12 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
   } else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("[WS] Client #%u disconnected\n", client->id());
+    // If this client owned the stream, tear it down NOW (close file, reset
+    // state) — otherwise the file handle leaks and LittleFS runs out of
+    // handles, breaking the next refresh.
+    if (s_stream_ch >= 0 && s_stream_client == (int)client->id()) {
+      streamAbort("disconnect");
+    }
   } else if (type == WS_EVT_DATA) {
     // APP commands over WebSocket: {type:'cmd', cmd:..., ...}
     if (!data || !len) return;
@@ -528,13 +553,17 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
               s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));
             }
             s_stream_last = 0;  // force first chunk immediately
+            s_stream_fail = 0;
+            s_done_fail = 0;
             ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts for the whole stream (no send-queue contention)
             ok = true;
           }
         }
         if (!ok) {
-          s_stream_ch = -1;
           if (s_stream_file) s_stream_file.close();
+          s_stream_ch = -1;
+          s_stream_client = -1;
+          ws_send_busy_until = 0;
         }
         ack["ok"] = ok;
         ack["total"] = ok ? s_stream_total : 0;
