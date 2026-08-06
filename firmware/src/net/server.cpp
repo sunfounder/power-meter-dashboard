@@ -264,6 +264,7 @@ static uint32_t s_stream_last = 0;   // last tick ms
 static int  s_stream_fail = 0;       // consecutive send failures (abort guard)
 static int  s_done_fail = 0;         // consecutive done-send failures (abort guard)
 static int  s_tx_mode = 0;           // 0=idle, 1=stream samples, 2=download bytes
+static int  s_backlog_cnt = 0;       // consecutive backpressure ticks (diag)
 
 // Abort a stream cleanly from ANY path: close the file handle, reset state,
 // resume broadcasts. This is the only place that tears the stream down, so no
@@ -290,6 +291,14 @@ void PowerMeterWebServer::streamTick() {
   if (!cl || cl->status() != WS_CONNECTED) {
     streamAbort("client gone");
     return;
+  }
+
+  // Diag: report progress every ~500ms while streaming (goes to WebLog file)
+  static uint32_t s_diag = 0;
+  if (++s_diag % 50 == 0) {
+    WebLog::getInstance().log("[STREAM] diag off=%u nfile=%u q=%u mode=%d",
+      (unsigned)s_stream_off, (unsigned)s_stream_n_file,
+      (unsigned)cl->queueLen(), s_tx_mode);
   }
 
   auto &rec = DataRecorder::getInstance();
@@ -332,8 +341,13 @@ void PowerMeterWebServer::streamTick() {
     if (cl->queueLen() >= 8) {
       s_stream_off -= n;  // rewind sample offset
       s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));  // AND file pos!
+      if (++s_backlog_cnt <= 5 || s_backlog_cnt % 100 == 0) {
+        Serial.printf("[STREAM] backpressure off=%u q=%u\n",
+          (unsigned)s_stream_off, (unsigned)cl->queueLen());
+      }
       return;
     }
+    s_backlog_cnt = 0;
     if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
       s_stream_fail = 0;  // sent OK
     } else {
