@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src * ws: http: https:; img-src 'self' data:; font-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src * ws: http: https:; img-src 'self' data:; font-src 'self' data:">
 <link rel="manifest" href="manifest.json">
 <title>SunFounder 功率计</title>
 <script src="vendor/echarts.min.js"></script>
@@ -764,7 +764,11 @@ function uc(){
         if(v===0||v===null||isNaN(v))v=lastNZ[i][m];else lastNZ[i][m]=v;
         pts.push(v||0);
       }
-      const idx=lastData.timestamp||sampleCount[i]++;  // real epoch seconds
+      if(!timeDecided[i]&&lastData.timestamp){
+        timeDecided[i]=true;
+        timeReal[i]=lastData.timestamp>1000000000;
+      }
+      const idx=timeReal[i]?(lastData.timestamp||0):(sampleCount[i]++);  // real epoch or relative index
       const opts={series:[]};
       for(let m=0;m<4;m++){
         const data=[...c.getOption().series[m].data];
@@ -837,6 +841,7 @@ function tr(i){
     setRecBtns(i,1);
     dataStore[i]=[];
     histQueue[i]=[];histData[i]=null;maxTs[i]=0;firstTs[i]=0;streamGot[i]=0;
+    timeDecided[i]=false;timeReal[i]=false;
     document.getElementById('dts'+i).style.display='none';
     // Clear chart (also reset X axis — previous recording may have pinned min/max)
     if(charts[i]){
@@ -1173,6 +1178,8 @@ let histData=[null,null,null,null];
 let histQueue=[null,null,null,null];  // parsed samples awaiting slow-draw
 let firstTs=[0,0,0,0];    // first sample epoch per channel (X axis min)
 let maxTs=[0,0,0,0];      // highest ts already drawn (dedupe on resume)
+let timeReal=[false,false,false,false];  // true: real-time X axis; false: sample-index axis
+let timeDecided=[false,false,false,false];
 const HIST_PER_FRAME=4;   // samples per channel per frame (~4pts/16ms ≈ 250 pts/s)
 
 // Slow-draw loop (rAF, frame-synced): queue fills fast from WS, chart grows smoothly
@@ -1206,27 +1213,38 @@ function appendStreamChunk(buf){
     if(!histQueue[i])histQueue[i]=[];
     for(let o=0;o<n;o++){
       const b=o*24;
-      const ts=v.getUint32(b,true);  // real epoch seconds
-      // Already drawn (resume from zero without device offset support) — skip
-      if(ts<=maxTs[i])continue;
-      maxTs[i]=ts;
-      // First sample → pin X axis (start ~ now) and mark the latest value
-      if(firstTs[i]===0&&ts>1000000000){
-        firstTs[i]=ts;
-        const nowTs=Math.floor(Date.now()/1000);
-        const ch=lastData&&lastData.channels[i];
-        setTimeout(()=>{
-          const c=charts[i];if(!c)return;
-          const opt={xAxis:{min:ts,max:Math.max(nowTs,ts+1)}};
-          if(ch&&ch.connected){
-            const ys=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
-            opt.series=[0,1,2,3].map(m=>({markPoint:{symbol:'circle',symbolSize:6,
-              itemStyle:{color:C[m]},label:{show:false},data:[{coord:[nowTs,disp(ys[m],i)]}]}}));
-          }
-          c.setOption(opt,{notMerge:false});
-        },0);
+      const ts=v.getUint32(b,true);  // real epoch seconds (may be 0 if NTP unsynced)
+      // Decide time mode from the first valid sample of this recording
+      if(!timeDecided[i]){
+        timeDecided[i]=true;
+        timeReal[i]=ts>1000000000;
       }
-      histQueue[i].push({ts,vals:[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)]});
+      let x;
+      if(timeReal[i]){
+        if(ts<1000000000)continue;      // stray unsynced sample — skip
+        x=ts;
+        if(ts<=maxTs[i])continue;       // already drawn (resume) — skip
+        maxTs[i]=ts;
+        // Pin X axis start at the recording start time
+        if(firstTs[i]===0){
+          firstTs[i]=ts;
+          const nowTs=Math.floor(Date.now()/1000);
+          const ch=lastData&&lastData.channels[i];
+          setTimeout(()=>{
+            const c=charts[i];if(!c)return;
+            const opt={xAxis:{min:ts,max:Math.max(nowTs,ts+1)}};
+            if(ch&&ch.connected){
+              const ys=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
+              opt.series=[0,1,2,3].map(m=>({markPoint:{symbol:'circle',symbolSize:6,
+                itemStyle:{color:C[m]},label:{show:false},data:[{coord:[nowTs,disp(ys[m],i)]}]}}));
+            }
+            c.setOption(opt,{notMerge:false});
+          },0);
+        }
+      }else{
+        x=sampleCount[i]++;  // relative sample index (0,1,2…) — continuous even if NTP syncs mid-recording
+      }
+      histQueue[i].push({ts:x,vals:[v.getFloat32(b+4,true),v.getFloat32(b+8,true),v.getFloat32(b+12,true),v.getFloat32(b+16,true)]});
     }
   }catch(e){console.log('[HIST] append err:',e.message);}
 }
