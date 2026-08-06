@@ -93,6 +93,23 @@ volatile uint8_t sta_drop_reason_flag = 0;
 bool ntp_done = false;  // NTP synced once (log only once)
 bool auto_resume_done = false;  // crash-recovery auto-resume ran once
 
+// Crash recovery: auto-resume any interrupted recordings found at boot.
+void autoResumeInterrupted() {
+  auto &rec = DataRecorder::getInstance();
+  char incompl[4][64];
+  rec.findIncomplete(incompl);
+  for (int i = 0; i < 4; i++) {
+    if (incompl[i][0]) {
+      String fn = incompl[i];
+      int pos = fn.indexOf("_ch");
+      String name = pos > 0 ? fn.substring(0, pos) : "test";
+      if (rec.resumeChannel(i, name.c_str(), incompl[i])) {
+        Serial.printf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
+      }
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(2000);
@@ -244,7 +261,7 @@ void loop() {
 
   // NTP retry: if STA connected but time not synced, retry every 30s
   // (China-friendly servers — pool.ntp.org is often unreachable domestically)
-  if (now - last_ntp_check > 30000 && WiFi.status() == WL_CONNECTED) {
+  if (now - last_ntp_check > 10000 && WiFi.status() == WL_CONNECTED) {  // 10s retry
     last_ntp_check = now;
     time_t t = time(nullptr);
     if (t < 1600000000) { // not synced yet
@@ -257,24 +274,17 @@ void loop() {
       Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d\n",
                     tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
                     tm->tm_hour, tm->tm_min, tm->tm_sec);
-      // Crash recovery: auto-resume interrupted recordings now that the clock
-      // is sane (findIncomplete filters by filename timestamp vs now).
       if (!auto_resume_done) {
         auto_resume_done = true;
-        auto &rec = DataRecorder::getInstance();
-        char incompl[4][64];
-        rec.findIncomplete(incompl);
-        for (int i = 0; i < 4; i++) {
-          if (incompl[i][0]) {
-            String fn = incompl[i];
-            int pos = fn.indexOf("_ch");
-            String name = pos > 0 ? fn.substring(0, pos) : "test";
-            if (rec.resumeChannel(i, name.c_str(), incompl[i])) {
-              Serial.printf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
-            }
-          }
-        }
+        autoResumeInterrupted();
       }
+    }
+    // NTP failed (no network): still auto-resume after 90s so a reset with a
+    // broken link doesn't lose the recording state forever.
+    if (!auto_resume_done && millis() > 90000) {
+      auto_resume_done = true;
+      Serial.println("[DR] NTP not synced — auto-resume with relaxed time filter");
+      autoResumeInterrupted();
     }
   }
 

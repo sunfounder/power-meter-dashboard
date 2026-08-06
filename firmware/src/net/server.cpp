@@ -123,10 +123,17 @@ void PowerMeterWebServer::update() {
   }
 }
 
-// NTP sync with China-friendly servers, using configured tz offset
+// NTP sync with China-friendly servers (domain + direct IPs to dodge DNS issues)
 void ntpSync() {
   int8_t tz = DeviceSettings::getInstance().tzOffset();
-  configTime(tz * 3600, 0, "ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org");
+  configTime(tz * 3600, 0,
+             "ntp.aliyun.com",
+             "203.107.6.88",        // ntp.aliyun.com direct IP
+             "ntp.tencent.com",
+             "120.25.115.20",       // ntp.tencent.com direct IP
+             "cn.pool.ntp.org",
+             "time.nist.gov",
+             "time.google.com");
 }
 
 void PowerMeterWebServer::startAP() {
