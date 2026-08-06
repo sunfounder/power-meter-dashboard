@@ -265,6 +265,109 @@ static int  s_stream_fail = 0;       // consecutive send failures (abort guard)
 static int  s_done_fail = 0;         // consecutive done-send failures (abort guard)
 static int  s_tx_mode = 0;           // 0=idle, 1=stream samples, 2=download bytes
 static int  s_backlog_cnt = 0;       // consecutive backpressure ticks (diag)
+static void streamAbort(const char *why);  // defined below
+
+// ── Cross-task command queue ──
+// WS events run on the AsyncTCP task; stream/file state is owned by the main
+// loop. Commands that touch that state are queued here and executed in loop().
+// (Direct cross-task access corrupted memory → panic in the idle task.)
+static volatile int s_cmd_pending = 0;  // 0 none, 1 stream_start, 2 download_start, 3 abort
+static int  s_cmd_ch = -1;
+static int  s_cmd_offset = 0;
+static char s_cmd_file[64] = "";
+static int  s_cmd_client = -1;
+static int  s_cmd_reqid = 0;
+
+// Execute queued commands — main loop context only (single-threaded with
+// streamTick/downloadTick, so no data races on stream/file state).
+void PowerMeterWebServer::processCmdQueue() {
+  if (!s_cmd_pending) return;
+  int cmd = s_cmd_pending;
+  s_cmd_pending = 0;
+
+  if (cmd == 3) {  // abort: client disconnected mid-stream
+    if (s_stream_client == s_cmd_client) streamAbort("disconnect");
+    return;
+  }
+  auto *cl = _ws.client(s_cmd_client);
+  if (!cl) return;  // client already gone
+  JsonDocument ack;
+  ack["type"] = "ack";
+  ack["cmd"] = cmd == 1 ? "stream_start" : "download_start";
+  ack["req_id"] = s_cmd_reqid;
+  ack["ok"] = false;
+
+  if (cmd == 1) {  // stream_start
+    int ch = s_cmd_ch;
+    if (ch >= 0 && ch <= 3) {
+      if (s_tx_mode != 0) streamAbort("restart");  // never overlap two streams
+      auto &rec = DataRecorder::getInstance();
+      const char *fname = nullptr;
+      if (s_cmd_file[0]) fname = s_cmd_file;
+      else fname = rec.currentFilename(ch);
+      String path;
+      if (s_cmd_file[0]) path = String("/data/") + s_cmd_file;
+      else if (fname && fname[0]) path = fname;
+      if (path.length() && LittleFS.exists(path)) {
+        s_stream_file = LittleFS.open(path);
+        if (s_stream_file) {
+          s_stream_ch = ch;
+          s_stream_client = s_cmd_client;
+          s_stream_off = s_cmd_offset;
+          s_stream_n_file = s_stream_file.size() / sizeof(SampleBin);
+          s_stream_total = s_stream_n_file + rec.bufferCount(ch);
+          if (s_stream_off > s_stream_total) s_stream_off = s_stream_total;
+          if (s_stream_off < s_stream_n_file) {
+            s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));
+          }
+          s_stream_last = 0;
+          s_stream_fail = 0;
+          s_done_fail = 0;
+          s_tx_mode = 1;
+          ws_send_busy_until = 0xFFFFFFFF;
+          ack["ok"] = true;
+          ack["total"] = s_stream_total;
+          ack["start_ts"] = (uint32_t)rec.channelState(ch).start_ts;
+        }
+      }
+      if (!ack["ok"]) {
+        if (s_stream_file) s_stream_file.close();
+        s_stream_ch = -1;
+        s_stream_client = -1;
+        s_tx_mode = 0;
+        ws_send_busy_until = 0;
+      }
+    }
+  } else {  // download_start
+    String fname = s_cmd_file;
+    if (fname.length() && fname.indexOf('/') < 0 && fname.indexOf('\\') < 0) {
+      String path = "/data/" + fname;
+      if (LittleFS.exists(path)) {
+        s_stream_file = LittleFS.open(path);
+        if (s_stream_file) {
+          s_tx_mode = 2;
+          s_stream_client = s_cmd_client;
+          s_stream_off = 0;
+          s_stream_total = s_stream_file.size();
+          s_stream_last = 0;
+          s_stream_fail = 0;
+          s_done_fail = 0;
+          ws_send_busy_until = 0xFFFFFFFF;
+          ack["ok"] = true;
+        }
+      }
+      if (!ack["ok"]) {
+        if (s_stream_file) s_stream_file.close();
+        s_stream_client = -1;
+        s_tx_mode = 0;
+        ws_send_busy_until = 0;
+      }
+    }
+  }
+  String j;
+  serializeJson(ack, j);
+  cl->text(j);
+}
 
 // Abort a stream cleanly from ANY path: close the file handle, reset state,
 // resume broadcasts. This is the only place that tears the stream down, so no
@@ -513,11 +616,10 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
   } else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("[WS] Client #%u disconnected\n", client->id());
-    // If this client owned the stream, tear it down NOW (close file, reset
-    // state) — otherwise the file handle leaks and LittleFS runs out of
-    // handles, breaking the next refresh.
+    // Queue the abort (executed in main loop — never touch stream state here)
     if (s_stream_ch >= 0 && s_stream_client == (int)client->id()) {
-      streamAbort("disconnect");
+      s_cmd_pending = 3;
+      s_cmd_client = client->id();
     }
   } else if (type == WS_EVT_DATA) {
     // APP commands over WebSocket: {type:'cmd', cmd:..., ...}
@@ -614,96 +716,6 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       delay(100);
       ESP.restart();
       return;
-    } else if (cmd == "download_start") {
-      String fname = doc["file"] | "";
-      bool ok = false;
-      if (fname.length() && fname.indexOf('/') < 0 && fname.indexOf('\\') < 0) {
-        String path = "/data/" + fname;
-        if (LittleFS.exists(path)) {
-          s_stream_file = LittleFS.open(path);
-          if (s_stream_file) {
-            s_tx_mode = 2;  // download mode (state machine, backpressured)
-            s_stream_client = client->id();
-            s_stream_off = 0;
-            s_stream_total = s_stream_file.size();
-            s_stream_last = 0;
-            s_stream_fail = 0;
-            s_done_fail = 0;
-            ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts during transfer
-            ok = true;
-          }
-        }
-      }
-      if (!ok) {
-        if (s_stream_file) s_stream_file.close();
-        s_stream_client = -1;
-        s_tx_mode = 0;
-        ws_send_busy_until = 0;
-      }
-      JsonDocument dack;
-      dack["type"] = "ack";
-      dack["cmd"] = "download_start";
-      dack["ok"] = ok;
-      dack["req_id"] = doc["req_id"] | 0;
-      String djson;
-      serializeJson(dack, djson);
-      client->text(djson);
-      return;
-    } else if (cmd == "stream_start") {
-      int ch = doc["ch"] | -1;
-      if (ch < 0 || ch > 3) { ack["ok"] = false; }
-      else {
-        // A previous stream may still be running (e.g. page watchdog re-sent).
-        // Tear it down cleanly first — never overlap two streams.
-        if (s_tx_mode != 0) streamAbort("restart");
-        auto &rec = DataRecorder::getInstance();
-        // File source: explicit filename (stopped recordings) or the current
-        // recording file (live). Validate: no path separators allowed.
-        String fname_arg = doc["file"] | "";
-        const char *fname = nullptr;
-        if (fname_arg.length()) {
-          if (fname_arg.indexOf('/') >= 0 || fname_arg.indexOf('\\') >= 0) {
-            ack["ok"] = false;
-          } else {
-            fname = fname_arg.c_str();
-          }
-        } else {
-          fname = rec.currentFilename(ch);
-        }
-        bool ok = false;
-        String path;
-        if (fname_arg.length()) path = "/data/" + fname_arg;  // explicit file
-        else if (fname && fname[0]) path = fname;             // current recording
-        if (path.length() && LittleFS.exists(path)) {
-          s_stream_file = LittleFS.open(path);
-          if (s_stream_file) {
-            s_stream_ch = ch;
-            s_stream_client = client->id();
-            s_stream_off = doc["offset"] | 0;   // resume point (sample index)
-            s_stream_n_file = s_stream_file.size() / sizeof(SampleBin);
-            s_stream_total = s_stream_n_file + rec.bufferCount(ch);
-            if (s_stream_off > s_stream_total) s_stream_off = s_stream_total;
-            if (s_stream_off < s_stream_n_file) {
-              s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));
-            }
-            s_stream_last = 0;  // force first chunk immediately
-            s_stream_fail = 0;
-            s_done_fail = 0;
-            s_tx_mode = 1;  // stream mode
-            ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts for the whole stream (no send-queue contention)
-            ok = true;
-          }
-        }
-        if (!ok) {
-          if (s_stream_file) s_stream_file.close();
-          s_stream_ch = -1;
-          s_stream_client = -1;
-          ws_send_busy_until = 0;
-        }
-        ack["ok"] = ok;
-        ack["total"] = ok ? s_stream_total : 0;
-        ack["start_ts"] = ok ? (uint32_t)rec.channelState(ch).start_ts : 0;
-      }
     } else if (cmd == "settings") {
       // Same params as POST /api/settings
       auto &cfg = DeviceSettings::getInstance();

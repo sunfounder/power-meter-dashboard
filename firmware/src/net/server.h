@@ -36,6 +36,8 @@ public:
   void streamTick();
   // Download: push raw file bytes with the same backpressure (called from main loop)
   void downloadTick();
+  // Execute queued WS commands (stream/download/abort) — main loop only
+  void processCmdQueue();
 
   // Notification
   void notifyAlarm(int channel, const char *message);

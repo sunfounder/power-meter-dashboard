@@ -252,6 +252,8 @@ void loop() {
         MeasurementEngine::getInstance().getLatest());
   }
 
+  // Execute queued WS commands (single-threaded with stream/download ticks)
+  PowerMeterWebServer::getInstance().processCmdQueue();
   // Push history stream chunks (throttled internally to ~50/s)
   PowerMeterWebServer::getInstance().streamTick();
   // Push download chunks (same backpressured state machine)
