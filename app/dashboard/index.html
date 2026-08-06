@@ -555,13 +555,13 @@ function ic(i){
       {type:'value',splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
-      {name:'V',type:'line',large:true,largeThreshold:500,yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
+      {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'A',type:'line',large:true,largeThreshold:500,yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
+      {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'W',type:'line',large:true,largeThreshold:500,yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
+      {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'C',type:'line',large:true,largeThreshold:500,yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
+      {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
     ],animation:false,progressive:200,progressiveThreshold:500});
   // Chart click → highlight matching table row
   c.on('click',p=>{ if(p&&p.dataIndex!=null)selChart(i,p.dataIndex); });
@@ -1214,21 +1214,15 @@ let timeDecided=[false,false,false,false];
 let fakeAnchor=[0,0,0,0];  // browser-clock anchor for unsynced (ts=0) recordings
 let seq=[0,0,0,0];         // relative sample index (fake mode)
 const HIST_BATCH_MS=150;   // redraw cadence (≈6.7 redraws/s per channel)
-// Adaptive batch: fast when the queue is deep, fine-grained near the end
-function histBatchSize(qlen){
-  if(qlen>1500)return 120;
-  if(qlen>500)return 50;
-  return 20;
-}
+const HIST_BATCH_N=25;     // samples per channel per redraw
 
-// Slow-draw loop: queue fills fast from WS, chart grows smoothly. Batch redraws
-// (60fps full setOption with growing arrays is what made it lag with lots of data).
+// Slow-draw loop: queue fills fast from WS, chart grows smoothly.
 setInterval(()=>{
   for(let i=0;i<4;i++){
     const q=histQueue[i];
     if(!q||!q.length)continue;
     const c=charts[i];if(!c)continue;
-    const batch=q.splice(0,histBatchSize(q.length));
+    const batch=q.splice(0,HIST_BATCH_N);
     if(!histData[i])histData[i]=[[],[],[],[]];
     for(const s of batch){
       for(let m=0;m<4;m++)histData[i][m].push([s.ts,disp(s.vals[m],i)]);
