@@ -505,7 +505,29 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     ack["type"] = "ack";
     ack["cmd"] = cmd;
 
-    if (cmd == "record_start") {
+    if (cmd == "get_status") {
+      // Same payload as the WS_CONNECT status message (recording + incomplete)
+      auto &recorder = DataRecorder::getInstance();
+      ack["type"] = "status";
+      ack["any_recording"] = recorder.isAnyRecording();
+      JsonArray rec_arr = ack["recording"].to<JsonArray>();
+      for (int i = 0; i < 4; i++) {
+        JsonObject r = rec_arr.add<JsonObject>();
+        r["active"]  = recorder.isChannelRecording(i);
+        r["elapsed"] = recorder.elapsedStr(i);
+        r["samples"] = recorder.channelState(i).sample_count;
+        r["last_file"] = recorder.channelState(i).last_file;
+      }
+      char incompl[4][64];
+      recorder.findIncomplete(incompl);
+      JsonArray inc_arr = ack["incomplete"].to<JsonArray>();
+      for (int i = 0; i < 4; i++) {
+        JsonObject o = inc_arr.add<JsonObject>();
+        o["ch"] = i;
+        o["file"] = incompl[i][0] ? incompl[i] : "";
+      }
+      ack["ok"] = true;
+    } else if (cmd == "record_start") {
       int ch = doc["ch"] | -1;
       String name = doc["name"] | "test";
       String resume = doc["resume_file"] | "";

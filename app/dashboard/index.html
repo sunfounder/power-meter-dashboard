@@ -270,6 +270,8 @@ function connectWS(ip){
     wsReq({type:'cmd',cmd:'get_settings'}).then(d=>{
       if(d&&d.version)document.getElementById('fwVer').textContent='固件版本: '+d.version;
     }).catch(()=>{});
+    // Ask for boot status: crash-recovery prompt (incomplete recordings) + states
+    wsReq({type:'cmd',cmd:'get_status'}).then(d=>{if(d)handleStatusMsg(d);}).catch(()=>{});
   };
   ws.onerror=e=>console.log('[WS] error',e.message||e.type);
   ws.onclose=e=>{
@@ -536,6 +538,32 @@ function ic(i){
 }
 
 // Process one measurement payload (from WebSocket)
+// Handle a status message (from get_status or WS_CONNECT): crash-recovery prompt
+function handleStatusMsg(d){
+  if(!d)return;
+  // Crash-recovery: device auto-resumes at boot — just inform (once)
+  if(d.incomplete&&!window.__incompleteAsked){
+    window.__incompleteAsked=true;
+    const found=d.incomplete.filter(x=>x&&x.file);
+    if(found.length){
+      const names=found.map(x=>'CH'+(x.ch+1)+':'+x.file).join(', ');
+      toast('检测到未完成录制，设备已自动续录: '+names);
+    }
+  }
+  // Restore recording UI state from device (used when page was refreshed)
+  if(d.recording)for(let i=0;i<4;i++){
+    const r=d.recording[i];if(!r)continue;
+    if(r.active&&recState[i]===0){
+      recState[i]=1;sampleCount[i]=r.samples||0;
+      document.getElementById('cr'+i).classList.add('recording');
+      setRecBtns(i,1);
+      const chIdx=i;
+      const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+      setTimeout(tryLoad,500);
+    }
+  }
+}
+
 function processData(d){
     if(!d)return;
     lastData=d;document.getElementById('connDot').className='conn-dot';

@@ -91,6 +91,7 @@ static void printAPDiagnostics() {
 volatile bool sta_dropped_flag = false;
 volatile uint8_t sta_drop_reason_flag = 0;
 bool ntp_done = false;  // NTP synced once (log only once)
+bool auto_resume_done = false;  // crash-recovery auto-resume ran once
 
 void setup() {
   Serial.begin(115200);
@@ -256,6 +257,24 @@ void loop() {
       Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d\n",
                     tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
                     tm->tm_hour, tm->tm_min, tm->tm_sec);
+      // Crash recovery: auto-resume interrupted recordings now that the clock
+      // is sane (findIncomplete filters by filename timestamp vs now).
+      if (!auto_resume_done) {
+        auto_resume_done = true;
+        auto &rec = DataRecorder::getInstance();
+        char incompl[4][64];
+        rec.findIncomplete(incompl);
+        for (int i = 0; i < 4; i++) {
+          if (incompl[i][0]) {
+            String fn = incompl[i];
+            int pos = fn.indexOf("_ch");
+            String name = pos > 0 ? fn.substring(0, pos) : "test";
+            if (rec.resumeChannel(i, name.c_str(), incompl[i])) {
+              Serial.printf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
+            }
+          }
+        }
+      }
     }
   }
 
