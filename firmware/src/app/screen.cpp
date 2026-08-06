@@ -278,13 +278,6 @@ void power_meter_init() {
   lv_obj_set_style_text_font(_wifi_ip_label, &lv_font_montserrat_14, 0);
   lv_obj_align(_wifi_ip_label, LV_ALIGN_RIGHT_MID, -4, 0);
 
-  // WiFi signal icon (LV_SYMBOL_WIFI) between SSID and IP, colored by RSSI
-  _wifi_rssi_label = lv_label_create(wifi_bar);
-  lv_label_set_text(_wifi_rssi_label, LV_SYMBOL_WIFI);
-  lv_obj_set_style_text_color(_wifi_rssi_label, lv_color_hex(0x777777), 0);
-  lv_obj_set_style_text_font(_wifi_rssi_label, &lv_font_montserrat_14, 0);
-  lv_obj_align(_wifi_rssi_label, LV_ALIGN_CENTER, 0, 0);
-
   // ---- Cards: fill from y=22 to y=148 ----
   const int card_y = 22;
   const int card_h = 148 - card_y;  // = 126
