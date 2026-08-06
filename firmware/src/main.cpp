@@ -261,7 +261,7 @@ void loop() {
 
   // NTP retry: if STA connected but time not synced, retry every 30s
   // (China-friendly servers — pool.ntp.org is often unreachable domestically)
-  if (now - last_ntp_check > 10000 && WiFi.status() == WL_CONNECTED) {  // 10s retry
+  if (now - last_ntp_check > 3000 && WiFi.status() == WL_CONNECTED) {  // 3s retry
     last_ntp_check = now;
     time_t t = time(nullptr);
     if (t < 1600000000) { // not synced yet
