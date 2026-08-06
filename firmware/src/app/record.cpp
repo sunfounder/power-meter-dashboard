@@ -170,10 +170,30 @@ bool DataRecorder::resumeChannel(int ch, const char *testName, const char *resum
 
   strncpy(_states[ch].name, testName, sizeof(_states[ch].name) - 1);
   _states[ch].name[sizeof(_states[ch].name) - 1] = '\0';
-  _states[ch].start_time = millis();
-  _states[ch].start_ts   = (uint32_t)time(nullptr);
   _states[ch].active = true;
   _states[ch].sample_count = sz / sizeof(SampleBin);  // carry existing samples
+  // Rewind start_time so the elapsed timer includes pre-crash history:
+  // prefer real timestamps (last - first), fall back to samples × interval.
+  size_t n = _states[ch].sample_count;
+  if (n > 0) {
+    uint32_t first_ts = 0, last_ts = 0;
+    File rf = LittleFS.open(path);
+    if (rf) {
+      SampleBin b;
+      if (rf.read((uint8_t *)&b, sizeof(SampleBin)) == sizeof(SampleBin)) first_ts = b.timestamp;
+      rf.seek((n - 1) * sizeof(SampleBin));
+      if (rf.read((uint8_t *)&b, sizeof(SampleBin)) == sizeof(SampleBin)) last_ts = b.timestamp;
+      rf.close();
+    }
+    if (first_ts > 1600000000 && last_ts >= first_ts) {
+      _states[ch].start_time = millis() - (uint32_t)(last_ts - first_ts) * 1000;
+    } else {
+      _states[ch].start_time = millis() - (uint32_t)n * DeviceSettings::getInstance().sampleIntervalMs();
+    }
+  } else {
+    _states[ch].start_time = millis();
+  }
+  _states[ch].start_ts   = (uint32_t)time(nullptr);
   _states[ch].last_file[0] = '\0';
   _rename_pending[ch] = false;
   DeviceSettings::getInstance().setStopArmed(ch, false, false);
