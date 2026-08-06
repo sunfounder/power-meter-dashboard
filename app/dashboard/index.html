@@ -291,10 +291,11 @@ function connectWS(ip){
           streamWatch=null;
           if(streamActive){
             if(++streamStall<=3){
-              console.log('[STREAM] stalled 3s — restart #'+streamStall);
-              const ci=streamChan;
+              const ci2=streamChan;
+              console.log('[STREAM] stalled 3s — resume from '+streamGot[ci2]+' (#'+streamStall+')');
               streamActive=false;streamChan=-1;
-              setTimeout(()=>loadBufferData(ci),500*streamStall);  // backoff
+              const resumeAt=streamGot[ci2]||0;
+              setTimeout(()=>loadBufferData(ci2,resumeAt),500*streamStall);  // backoff + resume
             }else{
               streamActive=false;streamChan=-1;
               toast('历史数据加载中断，请刷新重试');
@@ -807,6 +808,7 @@ function tr(i){
     document.getElementById('cr'+i).classList.remove('stopped');
     setRecBtns(i,1);
     dataStore[i]=[];
+    histQueue[i]=[];histData[i]=null;maxTs[i]=0;firstTs[i]=0;streamGot[i]=0;
     document.getElementById('dts'+i).style.display='none';
     // Clear chart
     if(charts[i]){
@@ -1076,6 +1078,7 @@ if(window.electron){
 window.addEventListener('resize',()=>{setTimeout(()=>charts.forEach(c=>c?.resize()),100);});
 // History stream state (binary chunks from device until stream_done)
 let streamActive=false, streamChunks=[], streamChan=-1, streamWatch=null, streamStall=0;
+let streamGot=[0,0,0,0];  // samples received per channel (for resume)
 let dlChunks=[], dlActive=false;
 async function downloadCSVFile(fname){
   if(dlActive){toast('已有下载进行中');return;}
@@ -1115,11 +1118,12 @@ async function downloadCSVFile(fname){
 }
 
 // ── Start history stream: chunks are appended to the chart as they arrive ──
-async function loadBufferData(i){
+async function loadBufferData(i, offset){
   if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
   streamChunks=[];streamActive=true;streamChan=i;
+  streamGot[i]=offset||0;
   try{
-    const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i},5000);
+    const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]},5000);
     if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
     // X axis starts at the recording start time (skip if NTP wasn't synced)
     if(ack.start_ts>1000000000){
@@ -1138,6 +1142,7 @@ async function loadBufferData(i){
 let histData=[null,null,null,null];
 let histQueue=[null,null,null,null];  // parsed samples awaiting slow-draw
 let firstTs=[0,0,0,0];    // first sample epoch per channel (X axis min)
+let maxTs=[0,0,0,0];      // highest ts already drawn (dedupe on resume)
 const HIST_PER_FRAME=4;   // samples per channel per frame (~4pts/16ms ≈ 250 pts/s)
 
 // Slow-draw loop (rAF, frame-synced): queue fills fast from WS, chart grows smoothly
@@ -1167,10 +1172,14 @@ function appendStreamChunk(buf){
     const v=new DataView(u8.buffer);
     const n=Math.floor(u8.byteLength/24);
     if(!n)return;
+    streamGot[i]+=n;
     if(!histQueue[i])histQueue[i]=[];
     for(let o=0;o<n;o++){
       const b=o*24;
       const ts=v.getUint32(b,true);  // real epoch seconds
+      // Already drawn (resume from zero without device offset support) — skip
+      if(ts<=maxTs[i])continue;
+      maxTs[i]=ts;
       // First sample → pin X axis (start ~ now) and mark the latest value
       if(firstTs[i]===0&&ts>1000000000){
         firstTs[i]=ts;

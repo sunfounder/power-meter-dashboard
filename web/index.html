@@ -808,6 +808,7 @@ function tr(i){
     document.getElementById('cr'+i).classList.remove('stopped');
     setRecBtns(i,1);
     dataStore[i]=[];
+    histQueue[i]=[];histData[i]=null;maxTs[i]=0;firstTs[i]=0;streamGot[i]=0;
     document.getElementById('dts'+i).style.display='none';
     // Clear chart
     if(charts[i]){
@@ -1141,6 +1142,7 @@ async function loadBufferData(i, offset){
 let histData=[null,null,null,null];
 let histQueue=[null,null,null,null];  // parsed samples awaiting slow-draw
 let firstTs=[0,0,0,0];    // first sample epoch per channel (X axis min)
+let maxTs=[0,0,0,0];      // highest ts already drawn (dedupe on resume)
 const HIST_PER_FRAME=4;   // samples per channel per frame (~4pts/16ms ≈ 250 pts/s)
 
 // Slow-draw loop (rAF, frame-synced): queue fills fast from WS, chart grows smoothly
@@ -1175,6 +1177,9 @@ function appendStreamChunk(buf){
     for(let o=0;o<n;o++){
       const b=o*24;
       const ts=v.getUint32(b,true);  // real epoch seconds
+      // Already drawn (resume from zero without device offset support) — skip
+      if(ts<=maxTs[i])continue;
+      maxTs[i]=ts;
       // First sample → pin X axis (start ~ now) and mark the latest value
       if(firstTs[i]===0&&ts>1000000000){
         firstTs[i]=ts;
