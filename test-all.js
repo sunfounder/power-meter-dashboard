@@ -5,6 +5,9 @@ const results = [];
 let rid = 0;
 const pending = {};
 
+// Connection timeout guard
+const connGuard = setTimeout(() => { console.log('[T] WS connect timeout'); process.exit(4); }, 15000);
+
 function req(cmd, payload, timeout = 8000) {
   return new Promise((res) => {
     const id = ++rid;
@@ -23,6 +26,7 @@ let t0 = Date.now();
 let dlBytes = 0, dlChunks = 0, streamBytes = 0, streamChunks = 0, streamDone = false;
 
 ws.onopen = async () => {
+  clearTimeout(connGuard);
   try {
     // 1. get_settings
     const s = await req('get_settings');

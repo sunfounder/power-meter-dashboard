@@ -317,12 +317,10 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
-    // Backpressure: if the WS send queue hasn't drained, pause until it does.
-    // This makes the stream self-throttle to whatever the link can actually
-    // deliver (no more queue overflow → connection drops).
-    if (!cl->canSend()) {
+    // Backpressure: keep the WS send queue shallow (≤8 of 16) so ACK jitter
+    // can never push it to the limit (queue full ⇒ connection dropped).
+    if (cl->queueLen() >= 8) {
       s_stream_off -= n;  // rewind: retry this chunk next tick
-      s_stream_fail = 0;  // not a failure — just waiting
       return;
     }
     if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
