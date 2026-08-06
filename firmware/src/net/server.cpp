@@ -303,7 +303,11 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
-    cl->binary((uint8_t *)chunk, n * sizeof(SampleBin));
+    if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
+      // sent — offsets already advanced
+    } else {
+      s_stream_off -= n;  // send failed (queue full): rewind and retry next tick
+    }
     return;
   }
 
@@ -314,7 +318,11 @@ void PowerMeterWebServer::streamTick() {
   done["total"] = s_stream_total;
   String j;
   serializeJson(done, j);
-  _ws.client(s_stream_client)->text(j);
+  // Done (retry if the send queue is full)
+  if (!cl->text(j)) {
+    Serial.println("[STREAM] done send failed, retrying");
+    return;  // keep s_stream_ch, retry next tick
+  }
   ws_send_busy_until = 0;  // resume broadcasts
   s_stream_ch = -1;
   Serial.printf("[STREAM] ch%d done, %u samples\n", s_stream_ch, s_stream_total);
