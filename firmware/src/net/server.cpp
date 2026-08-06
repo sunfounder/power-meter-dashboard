@@ -303,6 +303,11 @@ void PowerMeterWebServer::streamTick() {
   if (s_stream_off < s_stream_n_file) {
     size_t want = min((size_t)100, (size_t)(s_stream_n_file - s_stream_off));
     size_t got = s_stream_file.read((uint8_t *)chunk, want * sizeof(SampleBin));
+    if (got == 0) {
+      Serial.printf("[STREAM] READ0 off=%u nfile=%u pos=%u size=%u\n",
+        (unsigned)s_stream_off, (unsigned)s_stream_n_file,
+        (unsigned)s_stream_file.position(), (unsigned)s_stream_file.size());
+    }
     n = got / sizeof(SampleBin);
     s_stream_off += n;
     if (s_stream_off >= s_stream_n_file) s_stream_file.close();
@@ -325,7 +330,8 @@ void PowerMeterWebServer::streamTick() {
     // Backpressure: keep the WS send queue shallow (≤8 of 16) so ACK jitter
     // can never push it to the limit (queue full ⇒ connection dropped).
     if (cl->queueLen() >= 8) {
-      s_stream_off -= n;  // rewind: retry this chunk next tick
+      s_stream_off -= n;  // rewind sample offset
+      s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));  // AND file pos!
       return;
     }
     if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
@@ -334,6 +340,7 @@ void PowerMeterWebServer::streamTick() {
       // Send failed (queue full / dead connection): a few retries, then abort
       // so we never spin forever or leak the file handle.
       s_stream_off -= n;
+      s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));  // rewind file pos too
       if (++s_stream_fail > 5) streamAbort("send failed 5x");
     }
     return;
