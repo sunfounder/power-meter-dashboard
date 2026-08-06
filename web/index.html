@@ -182,6 +182,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
     <div class="section"><label>温度单位</label><div class="toggle-group"><button class="toggle-btn active" onclick="toggle2(this,'tuC','tuF');saveSet('temp_unit','C')" id="tuC">°C</button><button class="toggle-btn" onclick="toggle2(this,'tuF','tuC');saveSet('temp_unit','F')" id="tuF">°F</button></div></div>
     <div class="section"><label>环境温度校准</label><div class="row"><input type="number" id="calTemp" placeholder="实际温度" step="0.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;-moz-appearance:textfield"><button class="btn-buzz" onclick="calibrateAmbTemp()">校准</button></div></div>
     <div class="section"><label>采样间隔</label><select id="setSampleMs" onchange="saveSet('sample_interval_ms',this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;width:100%"><option value="100">0.1s (10Hz)</option><option value="200">0.2s (5Hz)</option><option value="500">0.5s (2Hz)</option><option value="1000" selected>1s (1Hz)</option><option value="5000">5s</option><option value="10000">10s</option></select></div>
+    <div class="section"><label>图表默认 X 轴范围</label><select id="setXModeSel" onchange="setXMode(this.value);applyXMode()" style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;background:var(--inner);color:var(--text);font-size:13px;width:100%"><option value="all">全部数据</option><option value="10m">最近 10 分钟</option><option value="1h">最近 1 小时</option><option value="4h">最近 4 小时</option></select></div>
     <div class="section"><button class="btn-restart" onclick="if(confirm('确认重启?')){wsSend({type:'cmd',cmd:'restart'});}">重启</button>
     <button class="btn-buzz" onclick="checkUpdate()" id="btnUpdate" style="width:100%;margin-top:4px">检查更新</button>
     <button class="btn-buzz" onclick="saveLog()" id="btnSaveLog" style="width:100%;margin-top:4px;display:none">导出日志</button>
@@ -948,6 +949,8 @@ function openSettings(){
     document.getElementById('tuF').className='toggle-btn'+(d.temp_unit=='F'?' active':'');
     document.getElementById('fwVer').textContent='固件版本: '+(d.version||'--');
     document.getElementById('setSampleMs').value=d.sample_interval_ms||1000;
+    const xm=document.getElementById('setXModeSel');
+    if(xm)xm.value=getXMode();
   }).catch(()=>toast('获取设置失败'));
 }
 function saveSet(k,v){
@@ -962,6 +965,23 @@ function saveSet(k,v){
 }
 function saveXMin(v){localStorage.setItem('pm_xmin',v);}
 function getXMin(){return parseInt(localStorage.getItem('pm_xmin'))||10;}
+// X axis default view: 'all' | '10m' | '1h' | '4h'
+function setXMode(v){localStorage.setItem('pm_xmode',v);}
+function getXMode(){return localStorage.getItem('pm_xmode')||'all';}
+// Apply the default X window to all charts (called periodically)
+let xAxisLast=0;
+function applyXMode(){
+  const mode=getXMode();
+  if(mode==='all')return;
+  const now=Math.floor(Date.now()/1000);
+  const span=mode==='10m'?600:mode==='1h'?3600:14400;
+  for(let i=0;i<4;i++){
+    const c=charts[i];if(!c)continue;
+    if(!firstTs[i]&&!maxTs[i])continue;  // no data yet
+    c.setOption({xAxis:{min:now-span,max:now}},{notMerge:false});
+  }
+}
+setInterval(()=>{const now=Date.now();if(now-xAxisLast>2000){xAxisLast=now;applyXMode();}},2000);
 function toggle2(btn, idA, idB){btn.classList.add('active');document.getElementById(idB).classList.remove('active');}
 function convTemp(c){return tempUnit==='F'?c*9/5+32:c;}
 function ut(){return tempUnit==='F'?'F':'C';}
