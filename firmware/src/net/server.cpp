@@ -296,7 +296,7 @@ void PowerMeterWebServer::streamTick() {
 
   // 1. File portion
   if (s_stream_off < s_stream_n_file) {
-    size_t want = min((size_t)30, (size_t)(s_stream_n_file - s_stream_off));
+    size_t want = min((size_t)100, (size_t)(s_stream_n_file - s_stream_off));
     size_t got = s_stream_file.read((uint8_t *)chunk, want * sizeof(SampleBin));
     n = got / sizeof(SampleBin);
     s_stream_off += n;
@@ -307,7 +307,7 @@ void PowerMeterWebServer::streamTick() {
     uint32_t bufStart = s_stream_off - s_stream_n_file;
     if (bufStart < cnt) {
       uint16_t head = rec.bufferHead(s_stream_ch);
-      size_t want = min((size_t)30, (size_t)(cnt - bufStart));
+      size_t want = min((size_t)100, (size_t)(cnt - bufStart));
       for (size_t k = 0; k < want; k++) {
         int idx = (head - cnt + bufStart + k + 60) % 60;
         chunk[n++] = rec.bufferData(s_stream_ch)[idx];
@@ -395,6 +395,7 @@ void PowerMeterWebServer::broadcastData(const MeasurementSnapshot &snap) {
   data["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
   data["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("");
   data["wifi_ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("");
+  data["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127;
 
   String json;
   serializeJson(doc, json);
@@ -538,10 +539,25 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       if (ch < 0 || ch > 3) { ack["ok"] = false; }
       else {
         auto &rec = DataRecorder::getInstance();
-        const char *fname = rec.currentFilename(ch);
+        // File source: explicit filename (stopped recordings) or the current
+        // recording file (live). Validate: no path separators allowed.
+        String fname_arg = doc["file"] | "";
+        const char *fname = nullptr;
+        if (fname_arg.length()) {
+          if (fname_arg.indexOf('/') >= 0 || fname_arg.indexOf('\\') >= 0) {
+            ack["ok"] = false;
+          } else {
+            fname = fname_arg.c_str();
+          }
+        } else {
+          fname = rec.currentFilename(ch);
+        }
         bool ok = false;
-        if (fname && fname[0] && LittleFS.exists(fname)) {
-          s_stream_file = LittleFS.open(fname);
+        String path;
+        if (fname_arg.length()) path = "/data/" + fname_arg;  // explicit file
+        else if (fname && fname[0]) path = fname;             // current recording
+        if (path.length() && LittleFS.exists(path)) {
+          s_stream_file = LittleFS.open(path);
           if (s_stream_file) {
             s_stream_ch = ch;
             s_stream_client = client->id();

@@ -156,6 +156,7 @@ body.locked .main-area{opacity:0.3;pointer-events:none}
   <div class="right">
     <span class="ambient" id="ambTemp">--.-</span>
     <span class="ambient" id="pageTime" style="font-variant-numeric:tabular-nums">--:--:--</span>
+    <span id="wifiIcon" title="WiFi 信号"><i class="fa fa-wifi"></i></span>
     <span class="conn-dot lost" id="connDot"></span>
     <button class="btn-icon" onclick="openFiles()" title="文件"><i class="fa fa-folder"></i></button>
     <button class="btn-icon" onclick="openSettings()" title="设置"><i class="fa fa-gear"></i></button>
@@ -589,6 +590,17 @@ function processData(d){
     if(!d)return;
     lastData=d;document.getElementById('connDot').className='conn-dot';
     if(d.temp_unit){tempUnit=d.temp_unit;}
+    // WiFi signal indicator (color by RSSI)
+    const wf=document.getElementById('wifiIcon');
+    if(wf){
+      const rssi=d.wifi_rssi!=null?d.wifi_rssi:-127;
+      wf.title='WiFi 信号: '+rssi+' dBm'+(d.wifi_ssid?' ('+d.wifi_ssid+')':'');
+      const i=wf.querySelector('i');
+      if(i){
+        i.style.color = rssi>=-60?'#3cb84c':rssi>=-75?'#e6c800':rssi>=-90?'#e27005':'#e02f2f';
+        i.style.opacity = d.wifi_connected?1:0.3;
+      }
+    }
     // Live WiFi status: update settings box + follow IP drift after reconnect
     if(d.wifi_ip){
       const ipInput=document.getElementById('setIP');
@@ -640,9 +652,10 @@ function processData(d){
           document.getElementById('cr'+i).classList.add('stopped');
           recFiles[i]=r.last_file||'';
           setRecBtns(i,2);
-          // Load recorded data into chart
+          // Load recorded data into chart (explicit file — recording is stopped)
           const chIdx=i;
-          const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+          const fname=recFiles[i];
+          const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx,0,fname);else setTimeout(tryLoad,200);};
           setTimeout(tryLoad,500);
         }
       }
@@ -1189,7 +1202,7 @@ async function downloadCSVFile(fname){
 }
 
 // ── Start history stream: chunks are appended to the chart as they arrive ──
-async function loadBufferData(i, offset){
+async function loadBufferData(i, offset, file){
   if(streamActive){console.log('[HIST] ch'+i+' stream already active');return;}
   streamChunks=[];streamActive=true;streamChan=i;
   streamGot[i]=offset||0;
@@ -1200,7 +1213,9 @@ async function loadBufferData(i, offset){
       xAxis:{min:null,max:null}},{notMerge:false});
   }
   try{
-    const ack=await wsReq({type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]},5000);
+    const req={type:'cmd',cmd:'stream_start',ch:i,offset:streamGot[i]};
+    if(file)req.file=file;  // stopped recording file (explicit filename)
+    const ack=await wsReq(req,5000);
     if(!ack||!ack.ok){streamActive=false;streamChan=-1;console.log('[HIST] ch'+i+' stream_start failed (no file?)');return;}
     // X axis starts at the recording start time (skip if NTP wasn't synced)
     if(ack.start_ts>1000000000){
