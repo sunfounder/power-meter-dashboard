@@ -274,6 +274,11 @@ function connectWS(ip){
   ws.onclose=e=>{
     console.log('[WS] closed code='+e.code+' reason='+e.reason);
     document.getElementById('connDot').className='conn-dot lost';
+    // Abort any in-flight history stream cleanly (no stale watchdog/state)
+    if(streamActive){
+      streamActive=false;streamChan=-1;
+      if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
+    }
     if(++wsRetry<3){wsTimer=setTimeout(()=>{console.log('[WS] retry '+wsRetry);connectWS(ip);},3000);}
     else if(!document.getElementById('connOverlay').classList.contains('show')){
       console.log('[WS] giving up — show connect screen');
@@ -559,12 +564,15 @@ function ic(i){
     ],
     series:[
       {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
+        areaStyle:{color:C[0],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
       {name:'A',type:'line',yAxisIndex:1,data:[],color:C[1],lineStyle:{color:C[1],width:1.5},symbol:'none',
+        areaStyle:{color:C[1],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
       {name:'W',type:'line',yAxisIndex:1,data:[],color:C[2],lineStyle:{color:C[2],width:1.5},symbol:'none',
+        areaStyle:{color:C[2],opacity:0.12},
         markLine:{symbol:'none',silent:true,lineStyle:{color:TC('mark'),type:'dashed',width:1},data:[{yAxis:0}],label:{show:false}}},
-      {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none'}
+      {name:'C',type:'line',yAxisIndex:2,data:[],color:C[3],lineStyle:{color:C[3],width:1.5},symbol:'none',areaStyle:{color:C[3],opacity:0.12}}
     ],animation:false,progressive:200,progressiveThreshold:500});
   // Chart click → highlight matching table row
   c.on('click',p=>{ if(p&&p.dataIndex!=null)selChart(i,p.dataIndex); });
