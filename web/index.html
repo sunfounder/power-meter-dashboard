@@ -281,6 +281,12 @@ function connectWS(ip){
     if(streamActive){
       streamActive=false;streamChan=-1;
       if(streamWatch){clearTimeout(streamWatch);streamWatch=null;}
+      // Release the waiting loadBufferData so it doesn't hang until timeout
+      if(streamDoneResolve){streamDoneResolve();streamDoneResolve=null;}
+      // Reset recording UI state so the reconnect path (onopen→get_status)
+      // re-triggers a fresh, complete history load.
+      if(streamChan>=0)recState[streamChan]=0;
+      else for(let i=0;i<4;i++)if(recState[i]===1)recState[i]=0;
     }
     if(++wsRetry<3){wsTimer=setTimeout(()=>{console.log('[WS] retry '+wsRetry);connectWS(ip);},3000);}
     else if(!document.getElementById('connOverlay').classList.contains('show')){
