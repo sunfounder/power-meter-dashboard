@@ -1214,15 +1214,17 @@ let timeReal=[false,false,false,false];  // true: real-time X axis; false: sampl
 let timeDecided=[false,false,false,false];
 let fakeAnchor=[0,0,0,0];  // browser-clock anchor for unsynced (ts=0) recordings
 let seq=[0,0,0,0];         // relative sample index (fake mode)
-const HIST_PER_FRAME=4;   // samples per channel per frame (~4pts/16ms ≈ 250 pts/s)
+const HIST_BATCH_MS=100;   // redraw cadence (10 redraws/s per channel)
+const HIST_BATCH_N=25;     // samples per channel per redraw (≈250 pts/s visual speed)
 
-// Slow-draw loop (rAF, frame-synced): queue fills fast from WS, chart grows smoothly
-function histLoop(){
+// Slow-draw loop: queue fills fast from WS, chart grows smoothly. Batch redraws
+// (60fps full setOption with growing arrays is what made it lag with lots of data).
+setInterval(()=>{
   for(let i=0;i<4;i++){
     const q=histQueue[i];
     if(!q||!q.length)continue;
     const c=charts[i];if(!c)continue;
-    const batch=q.splice(0,HIST_PER_FRAME);
+    const batch=q.splice(0,HIST_BATCH_N);
     if(!histData[i])histData[i]=[[],[],[],[]];
     for(const s of batch){
       for(let m=0;m<4;m++)histData[i][m].push([s.ts,disp(s.vals[m],i)]);
@@ -1231,9 +1233,7 @@ function histLoop(){
     for(let m=0;m<4;m++)opts.series.push({data:histData[i][m]});
     c.setOption(opts,{notMerge:false});
   }
-  requestAnimationFrame(histLoop);
-}
-requestAnimationFrame(histLoop);
+},HIST_BATCH_MS);
 
 // Append one binary chunk to the queue (slow-draw loop renders it)
 function appendStreamChunk(buf){
