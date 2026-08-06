@@ -741,7 +741,7 @@ function uc(){
       if(streamActive&&streamChan===i)continue;
       const ch=lastData.channels[i];if(!ch||!ch.connected)continue;
       const c=charts[i];if(!c){console.log('[UC] ch'+i+' chart null');continue;}
-      if(recState[i]!==1)continue;
+      if(recState[i]===2)continue;  // stopped: freeze history chart
       const raw=[ch.bus_voltage_V,ch.current_mA/1000,(ch.power_mW||0)/1000,ch.channel_temp_C];
       const pts=[];
       for(let m=0;m<4;m++){
@@ -754,6 +754,8 @@ function uc(){
       for(let m=0;m<4;m++){
         const data=[...c.getOption().series[m].data];
         data.push([idx,disp(pts[m],i)]);
+        // Keep a sliding window (~1h @1s) so idle preview doesn't grow forever
+        if(data.length>3600)data.splice(0,data.length-3600);
         opts.series.push({data});
       }
       c.setOption(opts,{notMerge:false});
@@ -810,9 +812,10 @@ function tr(i){
     dataStore[i]=[];
     histQueue[i]=[];histData[i]=null;maxTs[i]=0;firstTs[i]=0;streamGot[i]=0;
     document.getElementById('dts'+i).style.display='none';
-    // Clear chart
+    // Clear chart (also reset X axis — previous recording may have pinned min/max)
     if(charts[i]){
-      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
+      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
+        xAxis:{min:null,max:null}},{notMerge:false});
       lastNZ[i]=[0,0,0,0];
     }
     document.getElementById('rn'+i).textContent=pfx[i];
