@@ -284,6 +284,8 @@ void PowerMeterWebServer::processCmdQueue() {
   if (!s_cmd_pending) return;
   int cmd = s_cmd_pending;
   s_cmd_pending = 0;
+  Serial.printf("[CMDQ] cmd=%d ch=%d off=%d file='%s' client=%d reqid=%d\n",
+    cmd, s_cmd_ch, s_cmd_offset, s_cmd_file, s_cmd_client, s_cmd_reqid);
 
   if (cmd == 3) {  // abort: client disconnected mid-stream
     if (s_stream_client == s_cmd_client) streamAbort("disconnect");
@@ -308,9 +310,10 @@ void PowerMeterWebServer::processCmdQueue() {
       String path;
       if (s_cmd_file[0]) path = String("/data/") + s_cmd_file;
       else if (fname && fname[0]) path = fname;
+      Serial.printf("[STREAM] start ch=%d file='%s' path='%s' exists=%d\n",
+        ch, s_cmd_file[0] ? s_cmd_file : "(cur)", path.c_str(), (int)LittleFS.exists(path));
       if (path.length() && LittleFS.exists(path)) {
-        s_stream_file = LittleFS.open(path);
-        if (s_stream_file) {
+        s_stream_file = LittleFS.open(path);        if (s_stream_file) {
           s_stream_ch = ch;
           s_stream_client = s_cmd_client;
           s_stream_off = s_cmd_offset;
@@ -631,7 +634,27 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     ack["type"] = "ack";
     ack["cmd"] = cmd;
 
-    if (cmd == "get_status") {
+    if (cmd == "stream_start") {
+      // Queue for main-loop execution (cross-task safety)
+      s_cmd_pending = 1;
+      s_cmd_ch = doc["ch"] | -1;
+      s_cmd_offset = doc["offset"] | 0;
+      String f = doc["file"] | "";
+      strncpy(s_cmd_file, f.c_str(), sizeof(s_cmd_file) - 1);
+      s_cmd_file[sizeof(s_cmd_file) - 1] = '\0';
+      s_cmd_client = client->id();
+      s_cmd_reqid = doc["req_id"] | 0;
+      return;  // ack sent by processCmdQueue() in the main loop
+    } else if (cmd == "download_start") {
+      // Queue for main-loop execution (cross-task safety)
+      s_cmd_pending = 2;
+      String f2 = doc["file"] | "";
+      strncpy(s_cmd_file, f2.c_str(), sizeof(s_cmd_file) - 1);
+      s_cmd_file[sizeof(s_cmd_file) - 1] = '\0';
+      s_cmd_client = client->id();
+      s_cmd_reqid = doc["req_id"] | 0;
+      return;  // ack sent by processCmdQueue()
+    } else if (cmd == "get_status") {
       // Same payload as the WS_CONNECT status message (recording + incomplete)
       auto &recorder = DataRecorder::getInstance();
       ack["type"] = "status";
