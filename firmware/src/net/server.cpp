@@ -262,7 +262,7 @@ static uint32_t s_stream_last = 0;   // last tick ms
 void PowerMeterWebServer::streamTick() {
   if (s_stream_ch < 0) return;
   uint32_t now = millis();
-  if (now - s_stream_last < 20) return;  // throttle ~50 chunks/s
+  if (now - s_stream_last < 10) return;  // throttle ~100 chunks/s (windowed TX, backpressure below)
   s_stream_last = now;
 
   // Client may have disconnected mid-stream (e.g. page refresh) — abort cleanly
@@ -277,12 +277,14 @@ void PowerMeterWebServer::streamTick() {
 
   auto &rec = DataRecorder::getInstance();
 
-  SampleBin chunk[50];  // 50 × 24B = 1200B per frame
+  SampleBin chunk[100];  // 100 × 24B = 2400B per frame — big enough to trigger
+                        // lwIP windowed TX (multiple TCP segments in flight) instead
+                        // of the slow one-message-per-ACK path.
   size_t n = 0;
 
   // 1. File portion
   if (s_stream_off < s_stream_n_file) {
-    size_t want = min((size_t)50, (size_t)(s_stream_n_file - s_stream_off));
+    size_t want = min((size_t)30, (size_t)(s_stream_n_file - s_stream_off));
     size_t got = s_stream_file.read((uint8_t *)chunk, want * sizeof(SampleBin));
     n = got / sizeof(SampleBin);
     s_stream_off += n;
@@ -293,7 +295,7 @@ void PowerMeterWebServer::streamTick() {
     uint32_t bufStart = s_stream_off - s_stream_n_file;
     if (bufStart < cnt) {
       uint16_t head = rec.bufferHead(s_stream_ch);
-      size_t want = min((size_t)50, (size_t)(cnt - bufStart));
+      size_t want = min((size_t)30, (size_t)(cnt - bufStart));
       for (size_t k = 0; k < want; k++) {
         int idx = (head - cnt + bufStart + k + 60) % 60;
         chunk[n++] = rec.bufferData(s_stream_ch)[idx];
@@ -303,6 +305,13 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
+    // Backpressure: if the WS send queue hasn't drained, pause until it does.
+    // This makes the stream self-throttle to whatever the link can actually
+    // deliver (no more queue overflow → connection drops).
+    if (!cl->canSend()) {
+      s_stream_off -= n;  // rewind: retry this chunk next tick
+      return;
+    }
     if (cl->binary((uint8_t *)chunk, n * sizeof(SampleBin))) {
       // sent — offsets already advanced
     } else {
@@ -519,7 +528,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
               s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));
             }
             s_stream_last = 0;  // force first chunk immediately
-            ws_send_busy_until = millis() + 2000;  // quiet start
+            ws_send_busy_until = 0xFFFFFFFF;  // pause broadcasts for the whole stream (no send-queue contention)
             ok = true;
           }
         }

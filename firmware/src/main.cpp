@@ -119,6 +119,10 @@ void setup() {
     }
   });
 
+  // Disable WiFi modem sleep: power-save causes TX latency, packet loss and
+  // AsyncTCP "ack timeout" → WS connections drop with code 1006 under load.
+  WiFi.setSleep(false);
+
   Serial.println();
   Serial.println("========================================");
   Serial.printf("  %s v%s\n", PRODUCT_NAME, FIRMWARE_VERSION);
