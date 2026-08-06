@@ -1291,7 +1291,9 @@ setInterval(()=>{
   }
 },HIST_BATCH_MS);
 
-// Stream stall watchdog: resume from the received offset (keep collecting)
+// Stream stall watchdog: resume from the received offset (keep collecting).
+// 8s threshold — device backpressure can legitimately pause longer than 3s
+// on a weak link; a short threshold caused false resumes → double streams.
 function armStreamWatch(){
   if(streamWatch)clearTimeout(streamWatch);
   streamWatch=setTimeout(()=>{
@@ -1299,7 +1301,7 @@ function armStreamWatch(){
     if(!streamActive)return;
     if(++streamStall<=3){
       const ci2=streamChan;
-      console.log('[STREAM] stalled 3s — resume from '+streamGot[ci2]+' (#'+streamStall+')');
+      console.log('[STREAM] stalled 8s — resume from '+streamGot[ci2]+' (#'+streamStall+')');
       wsSend({type:'cmd',cmd:'stream_start',ch:ci2,offset:streamGot[ci2]});
       armStreamWatch();
     }else{
@@ -1307,7 +1309,7 @@ function armStreamWatch(){
       if(streamDoneResolve){streamDoneResolve();streamDoneResolve=null;}
       toast('历史数据加载中断，请刷新重试');
     }
-  },3000);
+  },8000);
 }
 </script>
 </body>

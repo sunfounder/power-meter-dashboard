@@ -632,6 +632,9 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       int ch = doc["ch"] | -1;
       if (ch < 0 || ch > 3) { ack["ok"] = false; }
       else {
+        // A previous stream may still be running (e.g. page watchdog re-sent).
+        // Tear it down cleanly first — never overlap two streams.
+        if (s_tx_mode != 0) streamAbort("restart");
         auto &rec = DataRecorder::getInstance();
         // File source: explicit filename (stopped recordings) or the current
         // recording file (live). Validate: no path separators allowed.
