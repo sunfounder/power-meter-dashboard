@@ -605,16 +605,20 @@ function processData(d){
         toast('CH'+(i+1)+' 录制已停止');
         loadFiles();
       }
-      // Refresh while stopped: recover stopped state from device
+      // Refresh while stopped: recover stopped state from device (unless user cleared it)
       if(!r.active && recState[i]===0 && r.last_file && !clearedFile[i]){
-        recState[i]=2;
-        document.getElementById('cr'+i).classList.add('stopped');
-        recFiles[i]=r.last_file||'';
-        setRecBtns(i,2);
-        // Load recorded data into chart
-        const chIdx=i;
-        const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
-        setTimeout(tryLoad,500);
+        // Skip files the user explicitly reset/cleared
+        let cl=[];try{cl=JSON.parse(localStorage.getItem('pm_cleared')||'[]');}catch(_){}
+        if(!cl.includes(r.last_file)){
+          recState[i]=2;
+          document.getElementById('cr'+i).classList.add('stopped');
+          recFiles[i]=r.last_file||'';
+          setRecBtns(i,2);
+          // Load recorded data into chart
+          const chIdx=i;
+          const tryLoad=()=>{if(charts[chIdx])loadBufferData(chIdx);else setTimeout(tryLoad,200);};
+          setTimeout(tryLoad,500);
+        }
       }
     }
     up();uc();updateTables();
@@ -791,12 +795,19 @@ function resetCh(i){
   recState[i]=0;
   document.getElementById('cr'+i).classList.remove('stopped');
   clearedFile[i]=true;
+  // Remember this file is cleared so a page refresh won't re-show it
+  try{
+    const cl=JSON.parse(localStorage.getItem('pm_cleared')||'[]');
+    if(recFiles[i]&&!cl.includes(recFiles[i])){cl.push(recFiles[i]);if(cl.length>20)cl.splice(0,cl.length-20);}
+    localStorage.setItem('pm_cleared',JSON.stringify(cl));
+  }catch(_){}
   document.getElementById('ct'+i).textContent='00:00';
   document.getElementById('dts'+i).style.display='none';
   document.getElementById('rn'+i).textContent=pfx[i];
   dataStore[i]=[];
   recFiles[i]='';
-  if(charts[i])charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}]});
+  if(charts[i])charts[i].setOption({series:[{data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}},
+    {data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}}],xAxis:{min:null,max:null}});
   setRecBtns(i,0);
   const btn=document.getElementById('cb'+i);
   if(btn&&lastData){const ok=lastData.channels[i].connected;btn.disabled=!ok;btn.style.opacity=ok?'':'0.35';}
@@ -814,7 +825,8 @@ function tr(i){
     document.getElementById('dts'+i).style.display='none';
     // Clear chart (also reset X axis — previous recording may have pinned min/max)
     if(charts[i]){
-      charts[i].setOption({series:[{data:[]},{data:[]},{data:[]},{data:[]}],
+      charts[i].setOption({series:[{data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}},
+        {data:[],markPoint:{data:[]}},{data:[],markPoint:{data:[]}}],
         xAxis:{min:null,max:null}},{notMerge:false});
       lastNZ[i]=[0,0,0,0];
     }
