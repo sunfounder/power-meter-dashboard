@@ -511,9 +511,13 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
           if (s_stream_file) {
             s_stream_ch = ch;
             s_stream_client = client->id();
-            s_stream_off = 0;
+            s_stream_off = doc["offset"] | 0;   // resume point (sample index)
             s_stream_n_file = s_stream_file.size() / sizeof(SampleBin);
             s_stream_total = s_stream_n_file + rec.bufferCount(ch);
+            if (s_stream_off > s_stream_total) s_stream_off = s_stream_total;
+            if (s_stream_off < s_stream_n_file) {
+              s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));
+            }
             s_stream_last = 0;  // force first chunk immediately
             ws_send_busy_until = millis() + 2000;  // quiet start
             ok = true;
