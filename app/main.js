@@ -11,7 +11,8 @@ function createWindow() {
     width: 1200, height: 850, frame: false,
     autoHideMenuBar: true,
     webPreferences: {
-      webSecurity: false,
+      // All device traffic is WebSocket now — no need to disable webSecurity.
+      // (GitHub release API allows CORS, so the update check still works.)
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
