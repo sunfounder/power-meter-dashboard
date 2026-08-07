@@ -233,9 +233,10 @@ void DataRecorder::findIncomplete(char out[4][64]) {
         int8_t tz = DeviceSettings::getInstance().tzOffset();
         ft -= tz * 3600;  // filename time is local; epoch is UTC
         time_t now = time(nullptr);
-        // Report any .dat file with a plausible filename timestamp (2020+).
-        // NTP may not be synced right after a reset — don't gate on it.
-        if (ft > 1600000000 && now > 1600000000 && (now - ft) < 48 * 3600) {  // within 48h
+        // Report .dat files with a plausible filename timestamp. When NTP is
+        // not synced yet (right after boot), report all of them so crash
+        // recovery still works — the 90s fallback path depends on this.
+        if (ft > 1600000000 && (now < 1600000000 || (now - ft) < 48 * 3600)) {
           const char *base = strrchr(nm.c_str(), '/');
           const char *bare = base ? base + 1 : nm.c_str();
           // Assign to a channel slot based on the chN marker in the name

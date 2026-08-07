@@ -124,9 +124,10 @@ void PowerMeterWebServer::update() {
 }
 
 // NTP sync with China-friendly servers (2 domains + 1 direct IP to dodge DNS issues)
+// tz=0: time() must stay UTC — display layers add the offset. Passing tz here
+// makes time() return local time on some IDF versions → double-offset displays.
 void ntpSync() {
-  int8_t tz = DeviceSettings::getInstance().tzOffset();
-  configTime(tz * 3600, 0,
+  configTime(0, 0,
              "ntp.aliyun.com",
              "ntp.tencent.com",
              "203.107.6.88");   // ntp.aliyun.com direct IP

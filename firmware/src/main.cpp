@@ -272,10 +272,13 @@ void loop() {
       Serial.printf("[NTP] Retry sync (UTC%+d) sntp=%d\n", tz, (int)sntp_get_sync_status());
     } else if (!ntp_done) {
       ntp_done = true;
-      struct tm *tm = localtime(&t);
-      Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d\n",
+      // time() is UTC — print local time (tz applied) for clarity
+      time_t lt = t + DeviceSettings::getInstance().tzOffset() * 3600;
+      struct tm *tm = localtime(&lt);
+      Serial.printf("[NTP] OK: %04d-%02d-%02d %02d:%02d:%02d (UTC%+d)\n",
                     tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
-                    tm->tm_hour, tm->tm_min, tm->tm_sec);
+                    tm->tm_hour, tm->tm_min, tm->tm_sec,
+                    (int)DeviceSettings::getInstance().tzOffset());
       if (!auto_resume_done) {
         auto_resume_done = true;
         autoResumeInterrupted();
