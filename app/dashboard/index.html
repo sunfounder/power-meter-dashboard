@@ -516,10 +516,20 @@ function ic(i){
       const d=new Date(v*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
     }}},
     yAxis:[
-      // abs mode: 0 at bottom (positive data only); signed mode: symmetric, 0 centered
-      {type:'value',min:v=>absMode[i]?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{show:false},axisLabel:{show:false},splitArea:{show:false}},
-      {type:'value',min:v=>absMode[i]?0:-Math.max(Math.abs(v.min),Math.abs(v.max)),max:v=>absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max)),splitLine:{show:false},axisLabel:{show:false}},
-      {type:'value',splitLine:{show:false},axisLabel:{show:false}}
+      // Min span so tiny noise (0.003) doesn't get magnified:
+      // V span ≥0.5, A/W span ≥0.5, C span ≥1.
+      {type:'value',
+        min:v=>{if(absMode[i])return 0;const s=v.max-v.min;return s<0.5?v.min-(0.5-s)/2:-Math.max(Math.abs(v.min),Math.abs(v.max));},
+        max:v=>{const s=v.max-v.min;if(s<0.5)return v.max+(0.5-s)/2;return absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max));},
+        splitLine:{show:false},axisLabel:{show:false},splitArea:{show:false}},
+      {type:'value',
+        min:v=>{if(absMode[i])return 0;const s=v.max-v.min;return s<0.5?v.min-(0.5-s)/2:-Math.max(Math.abs(v.min),Math.abs(v.max));},
+        max:v=>{const s=v.max-v.min;if(s<0.5)return v.max+(0.5-s)/2;return absMode[i]?undefined:Math.max(Math.abs(v.min),Math.abs(v.max));},
+        splitLine:{show:false},axisLabel:{show:false}},
+      {type:'value',
+        min:v=>{const s=v.max-v.min;return s<1?v.min-(1-s)/2:undefined;},
+        max:v=>{const s=v.max-v.min;return s<1?v.max+(1-s)/2:undefined;},
+        splitLine:{show:false},axisLabel:{show:false}}
     ],
     series:[
       {name:'V',type:'line',yAxisIndex:0,data:[],color:C[0],lineStyle:{color:C[0],width:1.5},symbol:'none',
@@ -1211,6 +1221,7 @@ async function loadBufferData(i, offset, file){
     let all=[];
     const PAGE=200;  // smaller pages: fewer TCP segments per response = less loss exposure
     let off=0;
+    let totalSamples=0;
     for(;;){
       const req={type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE};
       if(file)req.file=file;
@@ -1222,11 +1233,13 @@ async function loadBufferData(i, offset, file){
         catch(e){console.log('[HIST] ch'+i+' page '+off+' try '+r+' failed: '+e.message);await new Promise(s=>setTimeout(s,2000));}
       }
       if(!d||!d.data||!d.data.length)break;
+      if(d.total)totalSamples=d.total;
       all=all.concat(d.data);
-      if(ltxt)ltxt.textContent=all.length+' 点';
+      if(ltxt)ltxt.textContent=all.length+(totalSamples?'/'+totalSamples:'')+' 点';
       if(d.data.length<PAGE)break;
       off+=PAGE;
     }
+    console.log('[HIST] ch'+i+' got '+all.length+' / total '+totalSamples+(totalSamples&&all.length<totalSamples?'  (MISSING '+(totalSamples-all.length)+')':''));
     // Draw ONCE
     if(!all.length){console.log('[HIST] ch'+i+' empty');return;}
     const c=charts[i];if(!c){console.log('[HIST] ch'+i+' chart null');return;}

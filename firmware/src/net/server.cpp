@@ -725,6 +725,14 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         String f = doc["file"] | "";
         channelRecordAllToJson(arr, ch, offset, limit, f.length() ? f.c_str() : nullptr);
         ack["ok"] = true;
+        // Total samples available (file + ring buffer) for progress reporting
+        auto &rec2 = DataRecorder::getInstance();
+        String tpath;
+        if (f.length()) tpath = String("/data/") + f;
+        else { const char *cf = rec2.currentFilename(ch); if (cf) tpath = cf; }
+        int tN = 0;
+        if (tpath.length() && LittleFS.exists(tpath)) tN = LittleFS.open(tpath).size() / sizeof(SampleBin);
+        ack["total"] = tN + rec2.bufferCount(ch);
       }
     } else if (cmd == "files") {
       auto &rec = DataRecorder::getInstance();
