@@ -1209,12 +1209,18 @@ async function loadBufferData(i, offset, file){
   if(ltxt)ltxt.textContent='';
   try{
     const all=[];
-    const PAGE=500;
+    const PAGE=200;  // smaller pages: fewer TCP segments per response = less loss exposure
     let off=0;
     for(;;){
       const req={type:'cmd',cmd:'record_all',ch:i,offset:off,limit:PAGE};
       if(file)req.file=file;
-      const d=await wsReq(req,15000);
+      // Retry the page a few times — the WS may drop (flaky link), reconnect
+      // and continue from where we left off.
+      let d=null;
+      for(let r=0;r<3&&!d;r++){
+        try{d=await wsReq(req,15000);}
+        catch(e){console.log('[HIST] ch'+i+' page '+off+' try '+r+' failed: '+e.message);await new Promise(s=>setTimeout(s,2000));}
+      }
       if(!d||!d.data||!d.data.length)break;
       all=all.concat(d.data);
       if(ltxt)ltxt.textContent=all.length+' 点';
