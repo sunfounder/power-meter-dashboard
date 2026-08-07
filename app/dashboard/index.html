@@ -1208,7 +1208,7 @@ async function loadBufferData(i, offset, file){
   if(ld)ld.style.display='flex';
   if(ltxt)ltxt.textContent='';
   try{
-    const all=[];
+    let all=[];
     const PAGE=200;  // smaller pages: fewer TCP segments per response = less loss exposure
     let off=0;
     for(;;){
