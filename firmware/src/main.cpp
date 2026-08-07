@@ -105,6 +105,7 @@ void autoResumeInterrupted() {
       String name = pos > 0 ? fn.substring(0, pos) : "test";
       if (rec.resumeChannel(i, name.c_str(), incompl[i])) {
         Serial.printf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
+        WebLog::getInstance().logf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
       }
     }
   }
@@ -286,11 +287,16 @@ void loop() {
     }
     // NTP failed (no network): still auto-resume after 90s so a reset with a
     // broken link doesn't lose the recording state forever.
-    if (!auto_resume_done && millis() > 90000) {
-      auto_resume_done = true;
-      Serial.println("[DR] NTP not synced — auto-resume with relaxed time filter");
-      autoResumeInterrupted();
-    }
+    // NOTE: must NOT depend on WiFi.status() — crash recovery must work even
+    // when STA never connects (e.g. bad RF environment). See fallback below.
+  }
+
+  // Network-independent fallback: 90s after boot, regardless of STA/NTP,
+  // try to resume any interrupted recordings.
+  if (!auto_resume_done && millis() > 90000) {
+    auto_resume_done = true;
+    Serial.println("[DR] NTP not synced — auto-resume with relaxed time filter");
+    autoResumeInterrupted();
   }
 
   delay(5);
