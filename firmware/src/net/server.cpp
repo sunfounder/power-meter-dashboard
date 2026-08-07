@@ -42,7 +42,7 @@ static void handleWifiConfig(AsyncWebServerRequest *request);
 static void handleChannelRecordAll(AsyncWebServerRequest *request);
 // Shared JSON builders (WS + HTTP)
 static void settingsToJson(JsonDocument &doc);
-static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit);
+static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit, const char *fname_override = nullptr);
 
 // GET /api/storage — LittleFS space info
 static void handleStorage(AsyncWebServerRequest *request) {
@@ -442,14 +442,16 @@ void PowerMeterWebServer::streamTick() {
   }
 
   if (n > 0) {
-    // Backpressure: keep the WS send queue shallow (≤8 of 16) so ACK jitter
-    // can never push it to the limit (queue full ⇒ connection dropped).
-    if (cl->queueLen() >= 8) {
+    // Backpressure: only send when the lwIP send buffer can hold the WHOLE
+    // chunk. canSend() is true for any free byte → partial sends pile up in
+    // the WS message queue and overflow it. space() >= chunk avoids that.
+    size_t need = n * sizeof(SampleBin);
+    if (cl->client() == nullptr || cl->client()->space() < need) {
       s_stream_off -= n;  // rewind sample offset
       s_stream_file.seek((size_t)s_stream_off * sizeof(SampleBin));  // AND file pos!
       if (++s_backlog_cnt <= 5 || s_backlog_cnt % 100 == 0) {
-        Serial.printf("[STREAM] backpressure off=%u q=%u\n",
-          (unsigned)s_stream_off, (unsigned)cl->queueLen());
+        Serial.printf("[STREAM] backpressure off=%u space=%u need=%u\n",
+          (unsigned)s_stream_off, (unsigned)(cl->client() ? cl->client()->space() : 0), (unsigned)need);
       }
       return;
     }
@@ -500,7 +502,9 @@ void PowerMeterWebServer::downloadTick() {
   uint8_t buf[2048];
   size_t rd = s_stream_file.read(buf, sizeof(buf));
   if (rd > 0) {
-    if (cl->queueLen() >= 8) {
+    // Backpressure: buffer must hold the whole block (avoid partial sends
+    // piling up in the WS queue)
+    if (cl->client() == nullptr || cl->client()->space() < rd) {
       s_stream_file.seek(s_stream_file.position() - rd);  // rewind on backpressure
       return;
     }
@@ -718,7 +722,8 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         // Pause broadcasts so this (large) response isn't stuck in the send queue
         ws_send_busy_until = millis() + 8000;
         JsonArray arr = ack["data"].to<JsonArray>();
-        channelRecordAllToJson(arr, ch, offset, limit);
+        String f = doc["file"] | "";
+        channelRecordAllToJson(arr, ch, offset, limit, f.length() ? f.c_str() : nullptr);
         ack["ok"] = true;
       }
     } else if (cmd == "files") {
@@ -1022,13 +1027,20 @@ static void handleChannelRecordStart(AsyncWebServerRequest *request) {
 
 // GET /api/channel/<ch>/record/all — all data from .dat + buffer
 // Shared: fills a JsonArray with samples [offset, offset+limit)
-static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit) {
+static void channelRecordAllToJson(JsonArray &arr, int ch, int offset, int limit, const char *fname_override) {
   auto &rec = DataRecorder::getInstance();
 
   // Layout: [ file samples (n) ][ ring buffer samples (cnt) ]
-  const char *fname = rec.currentFilename(ch);
+  // fname_override: explicit file (stopped recordings); null → current recording
+  String fname;
+  if (fname_override && fname_override[0]) {
+    fname = String("/data/") + fname_override;
+  } else {
+    const char *cf = rec.currentFilename(ch);
+    if (cf) fname = cf;
+  }
   int n = 0;
-  if (fname && fname[0] && LittleFS.exists(fname)) {
+  if (fname.length() && LittleFS.exists(fname)) {
     File f = LittleFS.open(fname);
     if (f) { n = f.size() / sizeof(SampleBin); f.close(); }
   }
