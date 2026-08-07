@@ -105,7 +105,7 @@ void autoResumeInterrupted() {
       String name = pos > 0 ? fn.substring(0, pos) : "test";
       if (rec.resumeChannel(i, name.c_str(), incompl[i])) {
         Serial.printf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
-        WebLog::getInstance().logf("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
+        WebLog::getInstance().log("[DR] auto-resumed CH%d from %s\n", i + 1, incompl[i]);
       }
     }
   }
